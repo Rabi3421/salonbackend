@@ -26,6 +26,7 @@ const SalonUserSchema = new Schema(
     },
     isActive: { type: Boolean, default: true },
     lastLoginAt: { type: Date },
+    refreshTokenId: { type: String, default: null },
   },
   { timestamps: true },
 );
