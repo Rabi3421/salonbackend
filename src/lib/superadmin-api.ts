@@ -914,3 +914,152 @@ export function getEnquiryReport(params?: ReportParams) {
 export function getPlanUsageReport() {
   return request<Record<string, unknown>>("/api/superadmin/reports/plans");
 }
+
+// ── Website Content ──
+
+export type WebsiteContentImage = {
+  key: string;
+  url: string;
+  alt?: string;
+  title?: string;
+  sortOrder?: number;
+};
+
+export type WebsiteContentButton = {
+  label: string;
+  href: string;
+  type?: "primary" | "secondary" | "whatsapp" | "phone" | "link";
+  enabled?: boolean;
+};
+
+export type WebsiteContentSection = {
+  sectionKey: string;
+  sectionType: string;
+  enabled: boolean;
+  sortOrder: number;
+  content: Record<string, unknown>;
+  images: WebsiteContentImage[];
+  buttons: WebsiteContentButton[];
+  items: unknown[];
+  settings: Record<string, unknown>;
+};
+
+export type WebsiteContentSeo = {
+  metaTitle?: string;
+  metaDescription?: string;
+  keywords?: string[];
+  ogImageUrl?: string;
+};
+
+export type WebsiteContentPage = {
+  pageKey: string;
+  title: string;
+  slug: string;
+  seo: WebsiteContentSeo;
+  sections: WebsiteContentSection[];
+};
+
+export type WebsiteContentTheme = {
+  primaryColor: string;
+  secondaryColor: string;
+  accentColor: string;
+  backgroundColor: string;
+  textColor: string;
+  fontFamily: string;
+};
+
+export type WebsiteContentGlobal = {
+  salonName: string;
+  tagline: string;
+  logoUrl: string;
+  faviconUrl: string;
+  phone: string;
+  whatsapp: string;
+  email: string;
+  address: string;
+  city: string;
+  state: string;
+  instagramUrl: string;
+  facebookUrl: string;
+  googleMapUrl: string;
+  openingHours: string;
+};
+
+export type SalonWebsiteContent = {
+  _id?: string;
+  salonId: string;
+  status: "draft" | "published";
+  version: number;
+  theme: WebsiteContentTheme;
+  global: WebsiteContentGlobal;
+  pages: WebsiteContentPage[];
+  createdAt?: string;
+  updatedAt?: string;
+  publishedAt?: string;
+};
+
+export function fetchSalonWebsiteContent(salonId: string) {
+  return request<{ content: SalonWebsiteContent }>(
+    `/api/superadmin/salons/${salonId}/website-content`,
+  );
+}
+
+export function updateSalonWebsiteContent(
+  salonId: string,
+  payload: {
+    theme?: Partial<WebsiteContentTheme>;
+    global?: Partial<WebsiteContentGlobal>;
+    status?: "draft" | "published";
+  },
+) {
+  return request<{ content: SalonWebsiteContent }>(
+    `/api/superadmin/salons/${salonId}/website-content`,
+    { method: "PATCH", body: JSON.stringify(payload) },
+  );
+}
+
+export function fetchSalonWebsitePage(salonId: string, pageKey: string) {
+  return request<{ page: WebsiteContentPage }>(
+    `/api/superadmin/salons/${salonId}/website-content/pages/${pageKey}`,
+  );
+}
+
+export function updateSalonWebsitePage(
+  salonId: string,
+  pageKey: string,
+  payload: {
+    title?: string;
+    slug?: string;
+    seo?: WebsiteContentSeo;
+    sections?: WebsiteContentSection[];
+  },
+) {
+  return request<{ page: WebsiteContentPage }>(
+    `/api/superadmin/salons/${salonId}/website-content/pages/${pageKey}`,
+    { method: "PATCH", body: JSON.stringify(payload) },
+  );
+}
+
+export function updateSalonWebsiteSection(
+  salonId: string,
+  pageKey: string,
+  sectionKey: string,
+  payload: Partial<
+    Pick<
+      WebsiteContentSection,
+      "enabled" | "sortOrder" | "content" | "images" | "buttons" | "items" | "settings"
+    >
+  >,
+) {
+  return request<{ section: WebsiteContentSection }>(
+    `/api/superadmin/salons/${salonId}/website-content/pages/${pageKey}/sections/${sectionKey}`,
+    { method: "PATCH", body: JSON.stringify(payload) },
+  );
+}
+
+export function resetSalonWebsiteContent(salonId: string) {
+  return request<{ content: SalonWebsiteContent }>(
+    `/api/superadmin/salons/${salonId}/website-content/reset-default`,
+    { method: "POST", body: JSON.stringify({ confirm: true }) },
+  );
+}

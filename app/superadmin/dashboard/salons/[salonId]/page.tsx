@@ -145,6 +145,12 @@ export default function SalonDetailPage() {
               Manage Users
             </Link>
             <Link
+              href={`/superadmin/dashboard/salons/${salonId}/website-content`}
+              className="rounded-xl border border-indigo-200 px-3 py-2 text-sm font-medium text-indigo-600 shadow-sm transition hover:bg-indigo-50"
+            >
+              Website Content
+            </Link>
+            <Link
               href={`/superadmin/dashboard/salons/${salonId}/status`}
               className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
             >

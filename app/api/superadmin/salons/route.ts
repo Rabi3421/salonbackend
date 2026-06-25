@@ -21,6 +21,7 @@ import { SalonUser } from "@/src/models/SalonUser";
 import { Subscription } from "@/src/models/Subscription";
 import { Plan } from "@/src/models/Plan";
 import { getPlatformSettings } from "@/src/lib/platform-settings";
+import { createDefaultWebsiteContentForSalon } from "@/src/lib/salon-website-content-service";
 
 export async function GET(request: NextRequest) {
   try {
@@ -233,6 +234,26 @@ export async function POST(request: NextRequest) {
       nextBillingDate: trialEndDate,
       amount: 0,
     });
+
+    try {
+      await createDefaultWebsiteContentForSalon(
+        {
+          salonId,
+          name: input.name,
+          ownerName: input.ownerName,
+          ownerEmail: input.ownerEmail,
+          ownerPhone: input.ownerPhone,
+          city: input.city,
+          state: input.state,
+          address: input.address,
+          logoUrl: input.logoUrl,
+          businessType: input.businessType,
+        },
+        String(superadmin._id),
+      );
+    } catch (err) {
+      console.error("Website content creation warning:", (err as Error).message);
+    }
 
     await createAuditLog({
       actorType: "superadmin",
