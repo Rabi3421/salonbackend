@@ -22,6 +22,10 @@ const PaymentSchema = new Schema(
     billingPeriodStart: { type: Date },
     billingPeriodEnd: { type: Date },
     receiptNumber: { type: String, default: "", trim: true },
+    billingMonth: { type: Number },
+    billingYear: { type: Number },
+    notes: { type: String, default: "", trim: true },
+    recordedBy: { type: String, default: "", trim: true },
   },
   { timestamps: true },
 );

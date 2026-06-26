@@ -26,7 +26,8 @@ export async function resolveSalonFromRequest(
 
   const accessStatus = String(salonObj.accessStatus || salonObj.accountStatus || "");
 
-  if (["cancelled", "suspended", "access_blocked"].includes(accessStatus)) {
+  const blockedStatuses = ["cancelled", "blocked", "suspended", "access_blocked"];
+  if (blockedStatuses.includes(accessStatus)) {
     return {
       success: false,
       error: "Salon account is not active.",
@@ -34,12 +35,8 @@ export async function resolveSalonFromRequest(
     };
   }
 
-  if (
-    accessStatus !== "active" &&
-    accessStatus !== "trial" &&
-    accessStatus !== "payment_due" &&
-    accessStatus !== "grace_period"
-  ) {
+  const allowedStatuses = ["active", "trial", "unpaid", "payment_due", "grace_period"];
+  if (!allowedStatuses.includes(accessStatus)) {
     return {
       success: false,
       error: "Salon account is not active.",

@@ -13,7 +13,6 @@ import {
 import { SalonUser } from "@/src/models/SalonUser";
 import { Salon } from "@/src/models/Salon";
 import {
-  evaluateSalonSubscriptionAccess,
   getLatestSubscriptionForSalon,
   canRoleAccessPlan,
   buildSubscriptionWarning,
@@ -128,18 +127,18 @@ export async function requireSalonUser(
   const backendRole = userObj.role as SalonUserRole;
   const frontendRole = mapBackendSalonRoleToFrontend(backendRole);
 
-  const evaluatedSubscription = await evaluateSalonSubscriptionAccess(headerSalonId);
-  const subscription = evaluatedSubscription ?? await getLatestSubscriptionForSalon(headerSalonId);
+  const subscription = await getLatestSubscriptionForSalon(headerSalonId);
   const subscriptionObj = subscription as Record<string, unknown> | null;
   const accessStatus = String(subscriptionObj?.accessStatus || subscriptionObj?.status || salonResult.salon.accessStatus || salonResult.salon.accountStatus || "");
 
-  if (
-    !allowBlockedAccess &&
-    ["access_blocked", "suspended", "cancelled", "expired"].includes(accessStatus)
-  ) {
+  const blockedStatuses = ["blocked", "cancelled", "access_blocked", "suspended", "expired"];
+  if (!allowBlockedAccess && blockedStatuses.includes(accessStatus)) {
+    const message = accessStatus === "cancelled"
+      ? "Your subscription is cancelled. Please contact support."
+      : "Your salon access is blocked due to pending payment. Please contact support.";
     return {
       success: false,
-      error: "Your salon access is blocked due to pending subscription payment. Please contact support.",
+      error: message,
       status: 403,
     };
   }

@@ -1,12 +1,9 @@
 export type SalonSubscriptionAccessStatus =
   | "trial"
   | "active"
-  | "payment_due"
-  | "grace_period"
-  | "access_blocked"
-  | "suspended"
-  | "cancelled"
-  | "expired";
+  | "unpaid"
+  | "blocked"
+  | "cancelled";
 
 export type SalonSubscriptionPaymentStatus =
   | "pending"
@@ -24,24 +21,16 @@ export type SalonPaymentInstruction = {
 export type SalonCurrentSubscription = {
   planCode: "basic" | "premium" | string;
   planName: string;
-  accessStatus: SalonSubscriptionAccessStatus;
-  subscriptionStatus: string;
-  finalMonthlyPrice: number;
-  standardMonthlyPrice: number;
-  minimumMonthlyPrice?: number;
+  monthlyPrice: number;
+  standardPrice: number;
+  minimumPrice: number;
+  subscriptionStatus: SalonSubscriptionAccessStatus;
   trialStartDate: string | null;
   trialEndDate: string | null;
   nextDueDate: string | null;
-  nextGraceEndDate: string | null;
-  currentDueDate: string | null;
-  currentGraceEndDate: string | null;
-  paymentStatus: SalonSubscriptionPaymentStatus;
-  lastPaidAt: string | null;
+  graceEndDate: string | null;
+  lastPaymentDate: string | null;
   dueAmount: number;
-  billingPolicy?: {
-    collectionDay: number;
-    graceEndDay: number;
-  };
   subscriptionWarning?: string;
   paymentInstructions: SalonPaymentInstruction;
 };
@@ -53,8 +42,6 @@ export type SalonSubscriptionPaymentItem = {
   paymentStatus: SalonSubscriptionPaymentStatus;
   paymentDate: string | null;
   receiptNumber: string;
-  billingPeriodStart: string | null;
-  billingPeriodEnd: string | null;
   transactionId: string;
   notes: string;
 };
@@ -78,6 +65,14 @@ export type SalonDashboardMeta = {
     phone?: string;
     role: "owner" | "manager" | "receptionist" | "stylist" | "accountant";
   };
-  subscription: Omit<SalonCurrentSubscription, "paymentInstructions"> | null;
-  subscriptionWarning: string;
+  subscription: {
+    planCode: string;
+    planName: string;
+    monthlyPrice: number;
+    subscriptionStatus: string;
+    trialEndDate: string | null;
+    nextDueDate: string | null;
+    graceEndDate: string | null;
+    warningMessage: string;
+  } | null;
 };

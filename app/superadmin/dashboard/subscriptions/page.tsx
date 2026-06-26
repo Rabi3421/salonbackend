@@ -47,11 +47,8 @@ const CARDS: { label: string; key: string; color: string }[] = [
 const ACCESS_STATUSES: SubscriptionAccessStatus[] = [
   "trial",
   "active",
-  "payment_due",
-  "grace_period",
-  "access_blocked",
-  "expired",
-  "suspended",
+  "unpaid",
+  "blocked",
   "cancelled",
 ];
 

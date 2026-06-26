@@ -15,7 +15,6 @@ import {
   sanitizeSalonUser,
 } from "@/src/lib/auth/salon-permissions";
 import {
-  evaluateSalonSubscriptionAccess,
   getLatestSubscriptionForSalon,
   canRoleAccessPlan,
   buildSubscriptionPayload,
@@ -70,15 +69,15 @@ export async function POST(request: Request) {
 
     const backendRole = user.role as SalonUserRole;
     const frontendRole = mapBackendSalonRoleToFrontend(backendRole);
-    const evaluatedSubscription = await evaluateSalonSubscriptionAccess(salonId);
-    const subscription = evaluatedSubscription ?? await getLatestSubscriptionForSalon(salonId);
+    const subscription = await getLatestSubscriptionForSalon(salonId);
     const subscriptionPayload = buildSubscriptionPayload(subscription as Record<string, unknown> | null);
 
-    if (subscriptionPayload && ["access_blocked", "suspended", "cancelled", "expired"].includes(subscriptionPayload.accessStatus)) {
-      return errorResponse(
-        "Your salon access is blocked due to pending subscription payment. Please contact support.",
-        403,
-      );
+    const subStatus = subscriptionPayload?.subscriptionStatus ?? "";
+    if (["blocked", "cancelled", "access_blocked", "suspended", "expired"].includes(subStatus)) {
+      const msg = subStatus === "cancelled"
+        ? "Your subscription is cancelled. Please contact support."
+        : "Your salon access is blocked due to pending payment. Please contact support.";
+      return errorResponse(msg, 403);
     }
 
     if (subscription && !canRoleAccessPlan(frontendRole, (subscription as Record<string, unknown>).planCode)) {

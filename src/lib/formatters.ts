@@ -5,12 +5,14 @@ export function formatAccessStatus(status?: SubscriptionAccessStatus | string | 
   const labels: Record<string, string> = {
     trial: "Trial",
     active: "Active",
+    unpaid: "Unpaid",
+    blocked: "Blocked",
+    cancelled: "Cancelled",
     payment_due: "Payment Due",
     grace_period: "Grace Period",
     access_blocked: "Access Blocked",
     expired: "Expired",
     suspended: "Suspended",
-    cancelled: "Cancelled",
   };
   return labels[status] ?? status.replace(/_/g, " ");
 }

@@ -7,12 +7,15 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed:salon-demo": "tsx src/scripts/seed-salon-demo-data.ts",
-    "seed:salon-plans": "tsx src/scripts/seed-salon-subscription-plans.ts",
-    "backfill:salon-subscriptions": "tsx src/scripts/backfill-salon-subscriptions.ts"
+    "seed:salon-demo": "tsx -r dotenv/config src/scripts/seed-salon-demo-data.ts",
+    "seed:salon-plans": "tsx -r dotenv/config src/scripts/seed-salon-subscription-plans.ts",
+    "backfill:salon-subscriptions": "tsx -r dotenv/config src/scripts/backfill-salon-subscriptions.ts",
+    "seed:simple-plans": "tsx -r dotenv/config src/scripts/seed-simple-plans.ts",
+    "migrate:simple-statuses": "tsx -r dotenv/config src/scripts/migrate-to-simple-statuses.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
+    "dotenv": "^17.4.2",
     "jsonwebtoken": "^9.0.3",
     "libphonenumber-js": "^1.13.7",
     "mongoose": "^9.7.2",
@@ -29,6 +32,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.9",
     "tailwindcss": "^4",
+    "tsx": "^4.22.4",
     "typescript": "^5"
   }
 }

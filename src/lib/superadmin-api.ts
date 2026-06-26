@@ -4,8 +4,8 @@ import type {
   SalonSubscriptionPolicyUpdateResponse,
   SubscriptionAccessStatus,
   SubscriptionBlockPayload,
-  SubscriptionEvaluateAccessResponse,
   SubscriptionReactivatePayload,
+  SimplePaymentRecord,
 } from "@/src/types/superadmin-frontend";
 
 type ApiResponse<T = unknown> = {
@@ -24,6 +24,12 @@ async function request<T = unknown>(
     headers: { "Content-Type": "application/json", ...options?.headers },
     ...options,
   });
+
+  if (res.status === 401 && typeof window !== "undefined") {
+    const next = encodeURIComponent(window.location.pathname);
+    window.location.assign(`/superadmin/login?next=${next}`);
+    throw new Error("Session expired. Redirecting to login...");
+  }
 
   const json = (await res.json()) as ApiResponse<T>;
 
@@ -229,6 +235,20 @@ export function cancelSalon(salonId: string) {
   return request(`/api/superadmin/salons/${salonId}`, { method: "DELETE" });
 }
 
+export function toggleSalonActive(salonId: string) {
+  return request<{ salonId: string; isActive: boolean; accountStatus: string }>(
+    `/api/superadmin/salons/${salonId}/toggle-active`,
+    { method: "POST" },
+  );
+}
+
+export function permanentDeleteSalon(salonId: string) {
+  return request<{ salonId: string; salonName: string; deleted: Record<string, number> }>(
+    `/api/superadmin/salons/${salonId}/permanent-delete`,
+    { method: "DELETE", body: JSON.stringify({ confirm: true }) },
+  );
+}
+
 export type StatusPayload = {
   accountStatus?: string;
   websiteStatus?: string;
@@ -269,6 +289,68 @@ export function reactivateSalonSubscriptionAccess(
   return request<{ subscription: SalonSubscriptionPolicySummary }>(
     `/api/superadmin/salons/${salonId}/subscription/reactivate`,
     { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+// ── Simple Subscription ──
+
+export function getSimpleSubscription(salonId: string) {
+  return request<SalonSubscriptionPolicySummary>(
+    `/api/superadmin/salons/${salonId}/simple-subscription`,
+  );
+}
+
+export function updateSimpleSubscription(
+  salonId: string,
+  payload: SalonSubscriptionPolicyPayload,
+) {
+  return request<{ subscription: SalonSubscriptionPolicySummary }>(
+    `/api/superadmin/salons/${salonId}/simple-subscription`,
+    { method: "PATCH", body: JSON.stringify(payload) },
+  );
+}
+
+export function blockSalonSimple(salonId: string, payload: { reason: string }) {
+  return request(
+    `/api/superadmin/salons/${salonId}/simple-subscription/block`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export function reactivateSalonSimple(salonId: string, payload: { reason: string }) {
+  return request(
+    `/api/superadmin/salons/${salonId}/simple-subscription/reactivate`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export function markSalonUnpaid(salonId: string, payload: { reason: string }) {
+  return request(
+    `/api/superadmin/salons/${salonId}/simple-subscription/mark-unpaid`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export function cancelSalonSimple(salonId: string, payload: { reason: string }) {
+  return request(
+    `/api/superadmin/salons/${salonId}/simple-subscription/cancel`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export function recordSimplePayment(
+  salonId: string,
+  payload: { amount: number; paymentMode: string; transactionId?: string; paymentDate?: string; notes?: string },
+) {
+  return request<{ payment: SimplePaymentRecord; subscription: unknown }>(
+    `/api/superadmin/salons/${salonId}/simple-payments`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export function getSimplePayments(salonId: string) {
+  return request<{ payments: SimplePaymentRecord[] }>(
+    `/api/superadmin/salons/${salonId}/simple-payments`,
   );
 }
 
@@ -605,7 +687,7 @@ export function checkExpiredSubscriptions() {
 }
 
 export function evaluateAllSubscriptionAccess() {
-  return request<SubscriptionEvaluateAccessResponse>(
+  return request<Record<string, number>>(
     "/api/superadmin/subscriptions/evaluate-access",
     { method: "POST" },
   );

@@ -1,11 +1,8 @@
 export const ACCOUNT_STATUSES = [
   "trial",
   "active",
-  "payment_due",
-  "grace_period",
-  "access_blocked",
-  "expired",
-  "suspended",
+  "unpaid",
+  "blocked",
   "cancelled",
 ] as const;
 
@@ -22,11 +19,8 @@ export type WebsiteStatus = (typeof WEBSITE_STATUSES)[number];
 export const SUBSCRIPTION_STATUSES = [
   "trial",
   "active",
-  "payment_due",
-  "grace_period",
-  "access_blocked",
-  "expired",
-  "suspended",
+  "unpaid",
+  "blocked",
   "cancelled",
 ] as const;
 

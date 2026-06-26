@@ -8,7 +8,7 @@ export function PaymentInstructionsCard({
   subscription: SalonCurrentSubscription;
 }) {
   const instructions = subscription.paymentInstructions;
-  const amount = subscription.dueAmount || subscription.finalMonthlyPrice;
+  const amount = subscription.dueAmount || subscription.monthlyPrice;
   const note = instructions.note || `Subscription payment for ${subscription.planName}`;
 
   return (
@@ -48,7 +48,7 @@ export function PaymentInstructionsCard({
         </div>
       ) : (
         <p className="mt-5 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-          Payment details will be shared by support/superadmin.
+          Please pay before 10th to avoid access block. After payment, share transaction proof with support.
         </p>
       )}
     </section>

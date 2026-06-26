@@ -1,45 +1,37 @@
 export type SubscriptionAccessStatus =
   | "trial"
   | "active"
-  | "payment_due"
-  | "grace_period"
-  | "access_blocked"
-  | "expired"
-  | "suspended"
+  | "unpaid"
+  | "blocked"
   | "cancelled";
 
 export type SalonSubscriptionPolicyPayload = {
   planCode: "basic" | "premium";
-  finalMonthlyPrice: number;
+  monthlyPrice: number;
   negotiationNote?: string;
+  subscriptionStatus?: SubscriptionAccessStatus;
   nextDueDate?: string;
-  nextGraceEndDate?: string;
-  accessStatus: SubscriptionAccessStatus;
+  graceEndDate?: string;
 };
 
 export type SalonSubscriptionPolicySummary = {
-  subscriptionId: string;
   salonId: string;
+  salonName?: string;
   planCode: string;
-  planName?: string;
-  status: SubscriptionAccessStatus | string;
-  accessStatus?: SubscriptionAccessStatus;
-  paymentStatus?: string;
-  standardMonthlyPrice?: number;
-  minimumMonthlyPrice?: number;
-  finalMonthlyPrice?: number;
-  negotiatedMonthlyPrice?: number;
+  planName: string;
+  monthlyPrice: number;
+  standardPrice: number;
+  minimumPrice: number;
+  subscriptionStatus: SubscriptionAccessStatus | string;
+  trialStartDate?: string | null;
+  trialEndDate?: string | null;
+  nextDueDate?: string | null;
+  graceEndDate?: string | null;
+  lastPaymentDate?: string | null;
   negotiationNote?: string;
-  priceLockedBySuperadmin?: boolean;
-  trialStartDate?: string;
-  trialEndDate?: string;
-  currentDueDate?: string;
-  currentGraceEndDate?: string;
-  nextDueDate?: string;
-  nextGraceEndDate?: string;
-  nextBillingDate?: string;
-  lastPaidAt?: string;
-  lastPaymentId?: string;
+  isActive: boolean;
+  blockedAt?: string | null;
+  blockedReason?: string;
 };
 
 export type SalonSubscriptionPolicyUpdateResponse = {
@@ -54,11 +46,18 @@ export type SubscriptionReactivatePayload = {
   reason: string;
 };
 
-export type SubscriptionEvaluateAccessResponse = {
-  checked: number;
-  active: number;
-  trial: number;
-  paymentDue: number;
-  gracePeriod: number;
-  blocked: number;
+export type SimplePaymentRecord = {
+  paymentId: string;
+  salonId: string;
+  amount: number;
+  paymentMode: string;
+  paymentStatus: string;
+  paymentDate: string | null;
+  transactionId: string;
+  receiptNumber: string;
+  notes: string;
+  billingMonth?: number;
+  billingYear?: number;
+  recordedBy: string;
+  createdAt?: string;
 };

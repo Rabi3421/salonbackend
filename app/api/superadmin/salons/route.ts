@@ -12,16 +12,19 @@ import { validateCreateSalon } from "@/src/lib/validators/salon";
 import { createAuditLog } from "@/src/lib/audit-log";
 import { AUDIT_ACTIONS } from "@/src/constants/modules";
 import {
-  DEFAULT_TRIAL_DAYS,
   DEFAULT_PAGE_LIMIT,
   MAX_PAGE_LIMIT,
 } from "@/src/constants/salon";
 import {
-  BILLING_POLICY,
-  validateFinalMonthlyPrice,
-} from "@/src/lib/subscription-policy";
+  getPlan,
+  normalizePlanCode,
+  toStoredPlanCode,
+  validateNegotiatedPrice,
+  addOneMonth,
+  getNextDueDateAfter,
+  getGraceEndDateForDueDate,
+} from "@/src/lib/simple-subscription-policy";
 import {
-  buildInitialSubscriptionFields,
   syncSalonAccessFromSubscription,
 } from "@/src/lib/subscription-access-service";
 import { Salon } from "@/src/models/Salon";
@@ -93,20 +96,26 @@ export async function GET(request: NextRequest) {
       total: 0,
       trial: 0,
       active: 0,
-      payment_due: 0,
-      grace_period: 0,
-      access_blocked: 0,
-      expired: 0,
-      suspended: 0,
+      unpaid: 0,
+      blocked: 0,
       cancelled: 0,
     };
 
-    for (const s of summary) {
-      if (s._id && s._id in counts) {
-        counts[s._id] = s.count;
-      }
+    const legacyMap: Record<string, string> = {
+      payment_due: "unpaid",
+      grace_period: "unpaid",
+      access_blocked: "blocked",
+      suspended: "blocked",
+      expired: "cancelled",
+    };
 
+    for (const s of summary) {
       counts.total += s.count;
+      if (!s._id) continue;
+      const mapped = legacyMap[s._id] ?? s._id;
+      if (mapped in counts) {
+        counts[mapped] += s.count;
+      }
     }
 
     return successResponse({
@@ -160,42 +169,25 @@ export async function POST(request: NextRequest) {
       generateSubscriptionId(),
     ]);
 
-    let trialDays = input.trialDays ?? BILLING_POLICY.trialDays ?? DEFAULT_TRIAL_DAYS;
-
-    if (input.trialDays === undefined) {
-      const settings = await getPlatformSettings();
-      if (typeof settings.defaultTrialDays === "number") {
-        trialDays = settings.defaultTrialDays;
-      }
-    }
-
     const now = new Date();
-    const trialEndDate = new Date(
-      now.getTime() + trialDays * 24 * 60 * 60 * 1000,
-    );
+    const trialEndDate = addOneMonth(now);
 
-    let currentPlanCode = "PREMIUM";
+    const planCode = normalizePlanCode(input.planCode ?? "premium");
+    const currentPlanCode = toStoredPlanCode(planCode);
+    const plan = getPlan(planCode);
 
-    if (input.planCode) {
-      const plan = await Plan.findOne({
-        planCode: input.planCode.toUpperCase(),
-        isActive: true,
-      }).lean();
-
-      if (plan) {
-        currentPlanCode = input.planCode.toUpperCase();
-      }
-    }
-
-    const rawFinalMonthlyPrice = body.finalMonthlyPrice ?? body.negotiatedMonthlyPrice;
-    const finalMonthlyPrice = rawFinalMonthlyPrice !== undefined && rawFinalMonthlyPrice !== null && rawFinalMonthlyPrice !== ""
-      ? Number(rawFinalMonthlyPrice)
+    const rawPrice = body.monthlyPrice ?? body.finalMonthlyPrice ?? body.negotiatedMonthlyPrice;
+    const finalMonthlyPrice = rawPrice !== undefined && rawPrice !== null && rawPrice !== ""
+      ? Number(rawPrice)
       : undefined;
 
     if (finalMonthlyPrice !== undefined) {
-      const priceValidation = validateFinalMonthlyPrice(currentPlanCode, finalMonthlyPrice);
+      const priceValidation = validateNegotiatedPrice(planCode, finalMonthlyPrice);
       if (!priceValidation.valid) return errorResponse(priceValidation.error, 400);
     }
+
+    const nextDueDate = getNextDueDateAfter(trialEndDate);
+    const graceEndDate = getGraceEndDateForDueDate(nextDueDate);
 
     let temporaryPassword: string | undefined;
     let passwordToHash: string;
@@ -209,13 +201,7 @@ export async function POST(request: NextRequest) {
 
     const passwordHash = await hashPassword(passwordToHash);
 
-    const subscriptionFields = buildInitialSubscriptionFields({
-      planCode: currentPlanCode,
-      trialStartDate: now,
-      trialEndDate,
-      finalMonthlyPrice,
-      negotiationNote: body.negotiationNote ? String(body.negotiationNote) : "",
-    });
+    const effectivePrice = finalMonthlyPrice ?? plan.standardPrice;
 
     const salon = await Salon.create({
       salonId,
@@ -237,12 +223,19 @@ export async function POST(request: NextRequest) {
       trialStartDate: now,
       trialEndDate,
       currentPlanCode,
-      subscriptionPlan: subscriptionFields.planCode,
+      planCode,
+      planName: plan.name,
+      subscriptionPlan: currentPlanCode,
       subscriptionStatus: "trial",
-      nextBillingDate: subscriptionFields.nextDueDate,
-      graceEndDate: subscriptionFields.nextGraceEndDate,
-      finalMonthlyPrice: subscriptionFields.finalMonthlyPrice,
+      monthlyPrice: effectivePrice,
+      standardPrice: plan.standardPrice,
+      minimumPrice: plan.minimumPrice,
+      nextBillingDate: nextDueDate,
+      nextDueDate,
+      graceEndDate,
+      finalMonthlyPrice: effectivePrice,
       isActive: true,
+      negotiationNote: body.negotiationNote ? String(body.negotiationNote) : "",
     });
 
     const ownerUser = await SalonUser.create({
@@ -258,14 +251,24 @@ export async function POST(request: NextRequest) {
     const subscription = await Subscription.create({
       subscriptionId,
       salonId,
-      ...subscriptionFields,
-      planCode: subscriptionFields.planCode,
+      planCode: currentPlanCode,
+      planName: plan.name,
       status: "trial",
       accessStatus: "trial",
       paymentStatus: "pending",
-      billingCycle: "trial",
+      billingCycle: "monthly",
       startDate: now,
       endDate: trialEndDate,
+      amount: effectivePrice,
+      standardMonthlyPrice: plan.standardPrice,
+      finalMonthlyPrice: effectivePrice,
+      minimumMonthlyPrice: plan.minimumPrice,
+      negotiationNote: body.negotiationNote ? String(body.negotiationNote) : "",
+      trialStartDate: now,
+      trialEndDate,
+      nextDueDate,
+      nextGraceEndDate: graceEndDate,
+      nextBillingDate: nextDueDate,
     });
 
     await syncSalonAccessFromSubscription(subscription.toObject() as Record<string, unknown>);

@@ -19,18 +19,19 @@ export async function GET(request: Request) {
       .lean();
 
     return successResponse({
-      payments: payments.map((payment) => ({
-        paymentId: payment.paymentId,
-        amount: payment.amount,
-        paymentMode: payment.method,
-        paymentStatus: payment.status,
-        paymentDate: payment.paidAt ?? payment.createdAt,
-        receiptNumber: payment.receiptNumber ?? "",
-        billingPeriodStart: payment.billingPeriodStart ?? null,
-        billingPeriodEnd: payment.billingPeriodEnd ?? null,
-        transactionId: payment.transactionId ?? "",
-        notes: payment.referenceNote ?? "",
-      })),
+      payments: payments.map((p) => {
+        const obj = p as Record<string, unknown>;
+        return {
+          paymentId: obj.paymentId,
+          amount: obj.amount,
+          paymentMode: obj.method,
+          paymentStatus: obj.status,
+          paymentDate: obj.paidAt ?? obj.createdAt,
+          receiptNumber: obj.receiptNumber ?? "",
+          transactionId: obj.transactionId ?? "",
+          notes: obj.notes ?? obj.referenceNote ?? "",
+        };
+      }),
     });
   } catch {
     return errorResponse("Unable to load subscription payments.", 500);

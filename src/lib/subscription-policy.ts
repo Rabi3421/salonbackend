@@ -17,11 +17,13 @@ export const BILLING_POLICY = {
 export const ACCESS_STATUSES = [
   "trial",
   "active",
+  "unpaid",
+  "blocked",
+  "cancelled",
   "payment_due",
   "grace_period",
   "access_blocked",
   "suspended",
-  "cancelled",
   "expired",
 ] as const;
 

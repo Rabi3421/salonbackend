@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { errorResponse, successResponse } from "@/src/lib/api-response";
 import { connectDB } from "@/src/lib/db";
 import { resolveSalonFromRequest } from "@/src/lib/tenant/resolve-salon";
+import { Salon } from "@/src/models/Salon";
 import { SalonService } from "@/src/models/SalonService";
 import { SalonPackage } from "@/src/models/SalonPackage";
 import { SalonStaff } from "@/src/models/SalonStaff";
@@ -44,14 +45,48 @@ function isSeededSocialLink(href: unknown): boolean {
 
 export async function GET(request: Request) {
   try {
+    await connectDB();
+
+    const salonId = request.headers.get("x-salon-id");
+    if (!salonId) return errorResponse("Missing x-salon-id header.", 400);
+
+    const salonDoc = await Salon.findOne({ salonId }).lean() as Record<string, unknown> | null;
+    if (!salonDoc) return errorResponse("Salon not found.", 404);
+
+    const accessStatus = String(salonDoc.accessStatus || salonDoc.accountStatus || "");
+    const isActive = salonDoc.isActive;
+    const blockedStatuses = ["blocked", "cancelled", "suspended", "access_blocked"];
+
+    if (blockedStatuses.includes(accessStatus) || isActive === false) {
+      const ownerPhone = String(salonDoc.ownerPhone ?? "");
+      const ownerEmail = String(salonDoc.ownerEmail ?? "");
+      const city = String(salonDoc.city ?? "");
+      const state = String(salonDoc.state ?? "");
+      const address = String(salonDoc.address ?? "");
+
+      return NextResponse.json(
+        {
+          success: false,
+          blocked: true,
+          message: accessStatus === "cancelled"
+            ? "This salon is no longer available."
+            : "This salon is temporarily unavailable.",
+          salonName: salonDoc.name ?? "",
+          contact: {
+            phone: ownerPhone,
+            email: ownerEmail,
+            address: [address, city, state].filter(Boolean).join(", "),
+          },
+        },
+        { status: 403 },
+      );
+    }
+
     const salonResult = await resolveSalonFromRequest(request);
     if (!salonResult.success) {
       return errorResponse(salonResult.error, salonResult.status);
     }
 
-    await connectDB();
-
-    const salonId = salonResult.salon.salonId as string;
     const salon = salonResult.salon;
 
     const [services, packages, staff, settings] = await Promise.all([
