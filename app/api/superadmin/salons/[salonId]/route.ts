@@ -100,21 +100,9 @@ export async function PATCH(
     const input = validation.data;
     const before = salon.toObject();
 
-    if (input.slug && input.slug !== salon.slug) {
-      const slugExists = await Salon.findOne({
-        slug: input.slug,
-        salonId: { $ne: salonId },
-      }).lean();
-
-      if (slugExists) {
-        return errorResponse("Slug already in use.", 409);
-      }
-    }
-
     const salonUpdate: Record<string, unknown> = {};
 
     if (input.name !== undefined) salonUpdate.name = input.name;
-    if (input.slug !== undefined) salonUpdate.slug = input.slug;
     if (input.ownerName !== undefined) salonUpdate.ownerName = input.ownerName;
     if (input.ownerEmail !== undefined) salonUpdate.ownerEmail = input.ownerEmail;
     if (input.ownerPhone !== undefined) salonUpdate.ownerPhone = input.ownerPhone;

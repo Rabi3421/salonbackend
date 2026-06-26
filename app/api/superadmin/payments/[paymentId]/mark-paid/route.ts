@@ -43,6 +43,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         subscriptionId: payment.subscriptionId,
         salonId: payment.salonId,
         status: "paid",
+        paymentId,
+        paidAt: update.paidAt as Date,
       });
     }
 

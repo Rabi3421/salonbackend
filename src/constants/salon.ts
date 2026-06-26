@@ -1,6 +1,9 @@
 export const ACCOUNT_STATUSES = [
   "trial",
   "active",
+  "payment_due",
+  "grace_period",
+  "access_blocked",
   "expired",
   "suspended",
   "cancelled",
@@ -19,6 +22,9 @@ export type WebsiteStatus = (typeof WEBSITE_STATUSES)[number];
 export const SUBSCRIPTION_STATUSES = [
   "trial",
   "active",
+  "payment_due",
+  "grace_period",
+  "access_blocked",
   "expired",
   "suspended",
   "cancelled",
@@ -44,6 +50,10 @@ export const SALON_USER_ROLES = [
   "receptionist",
   "stylist",
   "cashier",
+  "staff",
+  "beautician",
+  "accountant",
+  "inventory_manager",
 ] as const;
 
 export type SalonUserRole = (typeof SALON_USER_ROLES)[number];
@@ -57,6 +67,7 @@ export const PAYMENT_METHODS = [
   "upi",
   "bank_transfer",
   "card",
+  "cheque",
   "gateway",
   "other",
 ] as const;
@@ -68,6 +79,6 @@ export const PAYMENT_STATUSES = [
   "refunded",
 ] as const;
 
-export const DEFAULT_TRIAL_DAYS = 14;
+export const DEFAULT_TRIAL_DAYS = 30;
 export const DEFAULT_PAGE_LIMIT = 20;
 export const MAX_PAGE_LIMIT = 100;

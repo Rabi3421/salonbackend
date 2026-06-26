@@ -1,6 +1,6 @@
 import { Payment } from "@/src/models/Payment";
 import { Subscription } from "@/src/models/Subscription";
-import { syncSalonSubscriptionState } from "@/src/lib/subscription-utils";
+import { applyPaymentToSubscription } from "@/src/lib/subscription-access-service";
 
 export function getPaymentAuditAction(status: string): string {
   switch (status) {
@@ -57,29 +57,17 @@ export async function syncSubscriptionAfterPayment(payment: {
   subscriptionId?: string;
   salonId: string;
   status: string;
+  paymentId?: string;
+  paidAt?: Date | string | null;
 }): Promise<void> {
   if (!payment.subscriptionId || payment.status !== "paid") return;
 
   const sub = await Subscription.findOne({ subscriptionId: payment.subscriptionId });
   if (!sub) return;
 
-  if (sub.status === "trial" || sub.status === "expired") {
-    await Subscription.updateOne(
-      { subscriptionId: payment.subscriptionId },
-      { $set: { status: "active" } },
-    );
-
-    const latest = await Subscription.findOne({ salonId: payment.salonId })
-      .sort({ createdAt: -1 })
-      .select("subscriptionId")
-      .lean();
-
-    if (latest && (latest as Record<string, unknown>).subscriptionId === payment.subscriptionId) {
-      await syncSalonSubscriptionState({
-        salonId: payment.salonId,
-        planCode: sub.planCode,
-        status: "active",
-      });
-    }
-  }
+  await applyPaymentToSubscription(payment.subscriptionId, {
+    paymentId: payment.paymentId ?? "",
+    salonId: payment.salonId,
+    paidAt: payment.paidAt ?? new Date(),
+  });
 }

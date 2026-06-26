@@ -1,5 +1,6 @@
 import type { BillingCycle } from "@/src/constants/salon";
 import { Salon } from "@/src/models/Salon";
+import { syncSalonAccessFromSubscription } from "@/src/lib/subscription-access-service";
 
 type PlanLike = {
   planCode: string;
@@ -54,19 +55,25 @@ export function calculateSubscriptionAmount(opts: {
 }
 
 export async function syncSalonSubscriptionState(sub: SubscriptionLike): Promise<void> {
+  await syncSalonAccessFromSubscription({
+    salonId: sub.salonId,
+    planCode: sub.planCode,
+    status: sub.status,
+    accessStatus: sub.status,
+  });
+
   const update: Record<string, unknown> = {
     currentPlanCode: sub.planCode,
+    subscriptionPlan: sub.planCode,
     subscriptionStatus: sub.status,
+    accessStatus: sub.status,
   };
 
-  if (sub.status === "active" || sub.status === "trial") {
+  if (sub.status === "active" || sub.status === "trial" || sub.status === "payment_due" || sub.status === "grace_period") {
     update.accountStatus = sub.status;
     update.isActive = true;
-  } else if (sub.status === "expired") {
-    update.accountStatus = "expired";
-    update.isActive = false;
-  } else if (sub.status === "suspended") {
-    update.accountStatus = "suspended";
+  } else if (sub.status === "expired" || sub.status === "access_blocked" || sub.status === "suspended") {
+    update.accountStatus = sub.status;
     update.isActive = false;
   } else if (sub.status === "cancelled") {
     update.accountStatus = "cancelled";

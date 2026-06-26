@@ -17,6 +17,10 @@ const BACKEND_TO_FRONTEND_ROLE: Record<SalonUserRole, FrontendSalonRole> = {
   receptionist: "receptionist",
   stylist: "stylist",
   cashier: "accountant",
+  staff: "stylist",
+  beautician: "stylist",
+  accountant: "accountant",
+  inventory_manager: "manager",
 };
 
 export function mapBackendSalonRoleToFrontend(

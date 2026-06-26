@@ -11,6 +11,13 @@ import {
   type FrontendSalonRole,
 } from "@/src/lib/auth/salon-permissions";
 import { SalonUser } from "@/src/models/SalonUser";
+import { Salon } from "@/src/models/Salon";
+import {
+  evaluateSalonSubscriptionAccess,
+  getLatestSubscriptionForSalon,
+  canRoleAccessPlan,
+  buildSubscriptionWarning,
+} from "@/src/lib/subscription-access-service";
 import type { SalonUserRole } from "@/src/constants/salon";
 
 export type SalonAuthResult =
@@ -20,6 +27,8 @@ export type SalonAuthResult =
       user: Record<string, unknown>;
       backendRole: SalonUserRole;
       frontendRole: FrontendSalonRole;
+      subscription?: Record<string, unknown> | null;
+      subscriptionWarning?: string;
     }
   | {
       success: false;
@@ -31,18 +40,27 @@ export type SalonAuthResult =
 type RequireSalonUserOptions = {
   allowedRoles?: FrontendSalonRole[];
   requireActiveUser?: boolean;
+  allowBlockedAccess?: boolean;
 };
 
 export async function requireSalonUser(
   request: Request,
   options: RequireSalonUserOptions = {},
 ): Promise<SalonAuthResult> {
-  const { allowedRoles, requireActiveUser = true } = options;
+  const { allowedRoles, requireActiveUser = true, allowBlockedAccess = false } = options;
 
   await connectDB();
 
   // 1. Resolve salon from x-salon-id header
-  const salonResult = await resolveSalonFromRequest(request);
+  let salonResult = await resolveSalonFromRequest(request);
+  if (!salonResult.success && allowBlockedAccess && salonResult.status === 403) {
+    const salonId = request.headers.get("x-salon-id");
+    const salon = salonId ? await Salon.findOne({ salonId }).lean() : null;
+    if (salon) {
+      salonResult = { success: true, salon: salon as Record<string, unknown> };
+    }
+  }
+
   if (!salonResult.success) {
     return {
       success: false,
@@ -110,6 +128,30 @@ export async function requireSalonUser(
   const backendRole = userObj.role as SalonUserRole;
   const frontendRole = mapBackendSalonRoleToFrontend(backendRole);
 
+  const evaluatedSubscription = await evaluateSalonSubscriptionAccess(headerSalonId);
+  const subscription = evaluatedSubscription ?? await getLatestSubscriptionForSalon(headerSalonId);
+  const subscriptionObj = subscription as Record<string, unknown> | null;
+  const accessStatus = String(subscriptionObj?.accessStatus || subscriptionObj?.status || salonResult.salon.accessStatus || salonResult.salon.accountStatus || "");
+
+  if (
+    !allowBlockedAccess &&
+    ["access_blocked", "suspended", "cancelled", "expired"].includes(accessStatus)
+  ) {
+    return {
+      success: false,
+      error: "Your salon access is blocked due to pending subscription payment. Please contact support.",
+      status: 403,
+    };
+  }
+
+  if (subscriptionObj && !canRoleAccessPlan(frontendRole, subscriptionObj.planCode)) {
+    return {
+      success: false,
+      error: "Your role is not available on the current subscription plan.",
+      status: 403,
+    };
+  }
+
   // 7. Check allowed roles
   if (allowedRoles && !hasSalonRole(frontendRole, allowedRoles)) {
     return { success: false, error: "Permission denied.", status: 403 };
@@ -121,5 +163,7 @@ export async function requireSalonUser(
     user: sanitizeSalonUser(userObj),
     backendRole,
     frontendRole,
+    subscription: subscriptionObj,
+    subscriptionWarning: buildSubscriptionWarning(subscriptionObj),
   };
 }

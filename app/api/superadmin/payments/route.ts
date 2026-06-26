@@ -127,6 +127,8 @@ export async function POST(request: NextRequest) {
         subscriptionId: input.subscriptionId,
         salonId: input.salonId,
         status: "paid",
+        paymentId,
+        paidAt: input.paidAt,
       });
     }
 

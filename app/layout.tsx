@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Rabivio — Salon Management Platform",
+  title: "RNPTECHSOLUTIONS — Salon Management Platform",
   description: "Multi-tenant SaaS platform for salon business management",
 };
 

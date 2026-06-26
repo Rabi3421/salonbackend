@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/refs, react-hooks/set-state-in-effect */
+
 import Link from "next/link";
 import { useEffect, useReducer, useState, useCallback, useRef } from "react";
 import { useParams } from "next/navigation";

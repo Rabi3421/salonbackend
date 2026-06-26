@@ -5,7 +5,6 @@ import { useEffect, useReducer, useState } from "react";
 
 import {
   getPlans,
-  deactivatePlan,
   seedDefaultPlans,
   type PlanListData,
   type PlanListParams,
@@ -14,7 +13,6 @@ import { StatusBadge } from "@/src/components/superadmin/StatusBadge";
 import { LoadingState } from "@/src/components/superadmin/LoadingState";
 import { ErrorState } from "@/src/components/superadmin/ErrorState";
 import { EmptyState } from "@/src/components/superadmin/EmptyState";
-import { ConfirmDialog } from "@/src/components/superadmin/ConfirmDialog";
 
 type FetchState = {
   data: PlanListData | null;
@@ -70,8 +68,6 @@ export default function PlansListPage() {
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
 
-  const [deactivateTarget, setDeactivateTarget] = useState<string | null>(null);
-  const [deactivating, setDeactivating] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [seedMsg, setSeedMsg] = useState("");
 
@@ -84,21 +80,6 @@ export default function PlansListPage() {
       .then((res) => dispatch({ type: "FETCH_SUCCESS", data: res.data! }))
       .catch((err: Error) => dispatch({ type: "FETCH_ERROR", error: err.message }));
   }, [search, status, page, state.fetchKey]);
-
-  async function handleDeactivate() {
-    if (!deactivateTarget) return;
-    setDeactivating(true);
-    try {
-      await deactivatePlan(deactivateTarget);
-      setDeactivateTarget(null);
-      dispatch({ type: "REFETCH" });
-    } catch (err) {
-      dispatch({ type: "FETCH_ERROR", error: (err as Error).message });
-      setDeactivateTarget(null);
-    } finally {
-      setDeactivating(false);
-    }
-  }
 
   async function handleSeed() {
     setSeeding(true);
@@ -127,8 +108,11 @@ export default function PlansListPage() {
         <div>
           <p className="text-sm font-medium text-indigo-600">Plans</p>
           <h1 className="mt-1 text-2xl font-semibold text-slate-900">
-            Manage Plans
+            Subscription Plans
           </h1>
+          <p className="mt-2 max-w-2xl text-sm text-slate-500">
+            Basic and Premium are fixed platform plans. Use salon subscription policy to negotiate prices per salon.
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button
@@ -139,14 +123,12 @@ export default function PlansListPage() {
           >
             {seeding ? "Seeding..." : "Seed Default Plans"}
           </button>
-          <Link
-            href="/superadmin/dashboard/plans/new"
-            className="shrink-0 rounded-xl bg-indigo-600 px-4 py-2 text-center text-sm font-medium text-white transition hover:bg-indigo-700"
-          >
-            Create Plan
-          </Link>
         </div>
       </section>
+
+      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+        Plan creation is intentionally disabled because subscription access, role permissions, pricing floors, due dates, and grace-period rules are tied to the fixed Basic/Premium policy.
+      </div>
 
       {seedMsg ? (
         <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
@@ -214,7 +196,7 @@ export default function PlansListPage() {
           <div className="p-4">
             <EmptyState
               title="No plans found"
-              description={search || status ? "Try different filters." : "Create your first plan or seed defaults."}
+              description={search || status ? "Try different filters." : "Seed the fixed Basic and Premium plans."}
             />
           </div>
         ) : (
@@ -225,7 +207,9 @@ export default function PlansListPage() {
                   <tr className="border-b border-slate-200 bg-slate-50">
                     <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Code</th>
                     <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Name</th>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Monthly</th>
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Standard Monthly</th>
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Minimum Monthly</th>
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Negotiation Range</th>
                     <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Yearly</th>
                     <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Trial</th>
                     <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Staff</th>
@@ -246,6 +230,12 @@ export default function PlansListPage() {
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-700">
                         {formatPrice(plan.monthlyPrice)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-700">
+                        {formatPrice(plan.minimumMonthlyPrice ?? plan.monthlyPrice)}
+                      </td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">
+                        {formatPrice(plan.minimumMonthlyPrice ?? plan.monthlyPrice)} - {formatPrice(plan.monthlyPrice)}
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-700">
                         {formatPrice(plan.yearlyPrice)}
@@ -276,21 +266,9 @@ export default function PlansListPage() {
                           >
                             View
                           </Link>
-                          <Link
-                            href={`/superadmin/dashboard/plans/${plan.planCode}/edit`}
-                            className="rounded border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
-                          >
-                            Edit
-                          </Link>
-                          {plan.isActive ? (
-                            <button
-                              type="button"
-                              onClick={() => setDeactivateTarget(plan.planCode)}
-                              className="rounded border border-red-200 px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50"
-                            >
-                              Deactivate
-                            </button>
-                          ) : null}
+                          <span className="rounded border border-slate-200 px-2 py-1 text-xs font-medium text-slate-400">
+                            Fixed
+                          </span>
                         </div>
                       </td>
                     </tr>
@@ -328,16 +306,6 @@ export default function PlansListPage() {
         )}
       </section>
 
-      <ConfirmDialog
-        open={!!deactivateTarget}
-        title="Deactivate this plan?"
-        description={`This will set plan ${deactivateTarget} to inactive. Existing subscriptions are not affected.`}
-        confirmLabel="Deactivate"
-        variant="danger"
-        loading={deactivating}
-        onConfirm={handleDeactivate}
-        onCancel={() => setDeactivateTarget(null)}
-      />
     </div>
   );
 }

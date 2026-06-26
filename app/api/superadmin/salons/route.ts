@@ -16,6 +16,14 @@ import {
   DEFAULT_PAGE_LIMIT,
   MAX_PAGE_LIMIT,
 } from "@/src/constants/salon";
+import {
+  BILLING_POLICY,
+  validateFinalMonthlyPrice,
+} from "@/src/lib/subscription-policy";
+import {
+  buildInitialSubscriptionFields,
+  syncSalonAccessFromSubscription,
+} from "@/src/lib/subscription-access-service";
 import { Salon } from "@/src/models/Salon";
 import { SalonUser } from "@/src/models/SalonUser";
 import { Subscription } from "@/src/models/Subscription";
@@ -85,6 +93,9 @@ export async function GET(request: NextRequest) {
       total: 0,
       trial: 0,
       active: 0,
+      payment_due: 0,
+      grace_period: 0,
+      access_blocked: 0,
       expired: 0,
       suspended: 0,
       cancelled: 0,
@@ -145,13 +156,11 @@ export async function POST(request: NextRequest) {
 
     const [salonId, slug, subscriptionId] = await Promise.all([
       generateSalonId(),
-      input.slug
-        ? generateUniqueSalonSlug(input.slug)
-        : generateUniqueSalonSlug(input.name),
+      generateUniqueSalonSlug(input.name),
       generateSubscriptionId(),
     ]);
 
-    let trialDays = input.trialDays ?? DEFAULT_TRIAL_DAYS;
+    let trialDays = input.trialDays ?? BILLING_POLICY.trialDays ?? DEFAULT_TRIAL_DAYS;
 
     if (input.trialDays === undefined) {
       const settings = await getPlatformSettings();
@@ -165,7 +174,7 @@ export async function POST(request: NextRequest) {
       now.getTime() + trialDays * 24 * 60 * 60 * 1000,
     );
 
-    let currentPlanCode = "";
+    let currentPlanCode = "PREMIUM";
 
     if (input.planCode) {
       const plan = await Plan.findOne({
@@ -176,6 +185,16 @@ export async function POST(request: NextRequest) {
       if (plan) {
         currentPlanCode = input.planCode.toUpperCase();
       }
+    }
+
+    const rawFinalMonthlyPrice = body.finalMonthlyPrice ?? body.negotiatedMonthlyPrice;
+    const finalMonthlyPrice = rawFinalMonthlyPrice !== undefined && rawFinalMonthlyPrice !== null && rawFinalMonthlyPrice !== ""
+      ? Number(rawFinalMonthlyPrice)
+      : undefined;
+
+    if (finalMonthlyPrice !== undefined) {
+      const priceValidation = validateFinalMonthlyPrice(currentPlanCode, finalMonthlyPrice);
+      if (!priceValidation.valid) return errorResponse(priceValidation.error, 400);
     }
 
     let temporaryPassword: string | undefined;
@@ -189,6 +208,14 @@ export async function POST(request: NextRequest) {
     }
 
     const passwordHash = await hashPassword(passwordToHash);
+
+    const subscriptionFields = buildInitialSubscriptionFields({
+      planCode: currentPlanCode,
+      trialStartDate: now,
+      trialEndDate,
+      finalMonthlyPrice,
+      negotiationNote: body.negotiationNote ? String(body.negotiationNote) : "",
+    });
 
     const salon = await Salon.create({
       salonId,
@@ -206,10 +233,15 @@ export async function POST(request: NextRequest) {
       logoUrl: input.logoUrl ?? "",
       websiteStatus: "inactive",
       accountStatus: "trial",
+      accessStatus: "trial",
       trialStartDate: now,
       trialEndDate,
       currentPlanCode,
+      subscriptionPlan: subscriptionFields.planCode,
       subscriptionStatus: "trial",
+      nextBillingDate: subscriptionFields.nextDueDate,
+      graceEndDate: subscriptionFields.nextGraceEndDate,
+      finalMonthlyPrice: subscriptionFields.finalMonthlyPrice,
       isActive: true,
     });
 
@@ -226,14 +258,17 @@ export async function POST(request: NextRequest) {
     const subscription = await Subscription.create({
       subscriptionId,
       salonId,
-      planCode: currentPlanCode || "TRIAL",
+      ...subscriptionFields,
+      planCode: subscriptionFields.planCode,
       status: "trial",
+      accessStatus: "trial",
+      paymentStatus: "pending",
       billingCycle: "trial",
       startDate: now,
       endDate: trialEndDate,
-      nextBillingDate: trialEndDate,
-      amount: 0,
     });
+
+    await syncSalonAccessFromSubscription(subscription.toObject() as Record<string, unknown>);
 
     try {
       await createDefaultWebsiteContentForSalon(

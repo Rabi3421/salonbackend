@@ -74,6 +74,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         subscriptionId: payment.subscriptionId,
         salonId: payment.salonId,
         status: newStatus,
+        paymentId,
+        paidAt: input.paidAt ?? payment.paidAt ?? new Date(),
       });
     }
 

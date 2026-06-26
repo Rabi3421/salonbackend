@@ -10,6 +10,8 @@ import {
   calculateSubscriptionAmount,
   syncSalonSubscriptionState,
 } from "@/src/lib/subscription-utils";
+import { getPlanPricing, validateFinalMonthlyPrice } from "@/src/lib/subscription-policy";
+import { getGraceEndForDueDate } from "@/src/lib/subscription-billing-dates";
 import { createAuditLog } from "@/src/lib/audit-log";
 import { AUDIT_ACTIONS } from "@/src/constants/modules";
 import { Subscription } from "@/src/models/Subscription";
@@ -73,6 +75,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       },
       amount: input.amount,
     });
+    const pricing = getPlanPricing(existObj.planCode);
+    const priceValidation = validateFinalMonthlyPrice(existObj.planCode, amount);
+    if (!priceValidation.valid) return errorResponse(priceValidation.error, 400);
 
     const newSubId = await generateSubscriptionId();
 
@@ -86,6 +91,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       endDate: dates.endDate,
       nextBillingDate: dates.nextBillingDate,
       amount,
+      planName: String(planObj.name ?? existObj.planCode),
+      standardMonthlyPrice: pricing.standardMonthlyPrice,
+      finalMonthlyPrice: amount,
+      minimumMonthlyPrice: pricing.minimumMonthlyPrice,
+      negotiatedMonthlyPrice: input.amount,
+      priceLockedBySuperadmin: input.amount !== undefined,
+      billingCollectionDay: 5,
+      graceEndDay: 10,
+      currentDueDate: dates.nextBillingDate,
+      currentGraceEndDate: getGraceEndForDueDate(dates.nextBillingDate),
+      nextDueDate: dates.nextBillingDate,
+      nextGraceEndDate: getGraceEndForDueDate(dates.nextBillingDate),
+      accessStatus: "active",
+      paymentStatus: "paid",
       notes: input.notes ?? `Renewed from ${subscriptionId}`,
     });
 

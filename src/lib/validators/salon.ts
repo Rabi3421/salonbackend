@@ -95,9 +95,6 @@ export function validateCreateSalon(
     pincode: body.pincode ? String(body.pincode).trim() : undefined,
     gstNumber: body.gstNumber ? (body.gstNumber as string).trim() : undefined,
     logoUrl: body.logoUrl ? (body.logoUrl as string).trim() : undefined,
-    slug: body.slug
-      ? (body.slug as string).toLowerCase().trim()
-      : undefined,
     trialDays:
       body.trialDays !== undefined && body.trialDays !== null
         ? Number(body.trialDays)
@@ -122,14 +119,6 @@ export function validateUpdateSalon(
     }
 
     data.name = body.name.trim();
-  }
-
-  if (body.slug !== undefined) {
-    if (typeof body.slug !== "string" || !body.slug.trim()) {
-      return { valid: false, error: "slug cannot be empty." };
-    }
-
-    data.slug = body.slug.toLowerCase().trim();
   }
 
   if (body.ownerName !== undefined) {

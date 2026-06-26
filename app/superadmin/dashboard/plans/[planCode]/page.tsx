@@ -1,15 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useReducer, useState } from "react";
+import { useEffect, useReducer } from "react";
 import { useParams } from "next/navigation";
 
-import { getPlan, deactivatePlan, type PlanDetailData } from "@/src/lib/superadmin-api";
+import { getPlan, type PlanDetailData } from "@/src/lib/superadmin-api";
 import { PLAN_MODULES, MODULE_META } from "@/src/constants/modules";
 import { StatusBadge } from "@/src/components/superadmin/StatusBadge";
 import { LoadingState } from "@/src/components/superadmin/LoadingState";
 import { ErrorState } from "@/src/components/superadmin/ErrorState";
-import { ConfirmDialog } from "@/src/components/superadmin/ConfirmDialog";
 
 type FetchState = {
   data: PlanDetailData | null;
@@ -62,28 +61,11 @@ export default function PlanDetailPage() {
     fetchKey: 0,
   });
 
-  const [showDeactivate, setShowDeactivate] = useState(false);
-  const [deactivating, setDeactivating] = useState(false);
-
   useEffect(() => {
     getPlan(planCode)
       .then((res) => dispatch({ type: "FETCH_SUCCESS", data: res.data! }))
       .catch((err: Error) => dispatch({ type: "FETCH_ERROR", error: err.message }));
   }, [planCode, state.fetchKey]);
-
-  async function handleDeactivate() {
-    setDeactivating(true);
-    try {
-      await deactivatePlan(planCode);
-      setShowDeactivate(false);
-      dispatch({ type: "REFETCH" });
-    } catch (err) {
-      dispatch({ type: "FETCH_ERROR", error: (err as Error).message });
-      setShowDeactivate(false);
-    } finally {
-      setDeactivating(false);
-    }
-  }
 
   const { data, loading, error } = state;
 
@@ -104,21 +86,9 @@ export default function PlanDetailPage() {
         <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h1 className="text-2xl font-semibold text-slate-900">{plan.name}</h1>
           <div className="flex flex-wrap gap-2">
-            <Link
-              href={`/superadmin/dashboard/plans/${planCode}/edit`}
-              className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
-            >
-              Edit Plan
-            </Link>
-            {plan.isActive ? (
-              <button
-                type="button"
-                onClick={() => setShowDeactivate(true)}
-                className="rounded-xl border border-red-200 px-3 py-2 text-sm font-medium text-red-600 transition hover:bg-red-50"
-              >
-                Deactivate
-              </button>
-            ) : null}
+            <span className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">
+              Fixed platform plan
+            </span>
             <Link
               href="/superadmin/dashboard/plans"
               className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50"
@@ -147,7 +117,13 @@ export default function PlanDetailPage() {
         <section className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-sm">
           <h2 className="text-base font-semibold text-slate-900">Pricing & Limits</h2>
           <dl className="mt-4 space-y-3">
-            <InfoRow label="Monthly Price">{formatPrice(plan.monthlyPrice)}</InfoRow>
+            <InfoRow label="Standard Monthly Price">{formatPrice(plan.monthlyPrice)}</InfoRow>
+            <InfoRow label="Minimum Monthly Price">
+              {formatPrice(plan.minimumMonthlyPrice ?? plan.monthlyPrice)}
+            </InfoRow>
+            <InfoRow label="Negotiation Range">
+              {formatPrice(plan.minimumMonthlyPrice ?? plan.monthlyPrice)} - {formatPrice(plan.monthlyPrice)}
+            </InfoRow>
             <InfoRow label="Yearly Price">{formatPrice(plan.yearlyPrice)}</InfoRow>
             <InfoRow label="Trial Days">{plan.trialDays} days</InfoRow>
             <InfoRow label="Max Staff">{plan.maxStaff}</InfoRow>
@@ -189,17 +165,6 @@ export default function PlanDetailPage() {
           </dl>
         </section>
       </div>
-
-      <ConfirmDialog
-        open={showDeactivate}
-        title="Deactivate this plan?"
-        description={`This will set ${plan.name} to inactive. Existing subscriptions are not affected.`}
-        confirmLabel="Deactivate"
-        variant="danger"
-        loading={deactivating}
-        onConfirm={handleDeactivate}
-        onCancel={() => setShowDeactivate(false)}
-      />
     </div>
   );
 }

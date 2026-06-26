@@ -19,14 +19,12 @@ export type CreateSalonInput = {
   pincode?: string;
   gstNumber?: string;
   logoUrl?: string;
-  slug?: string;
   trialDays?: number;
   planCode?: string;
 };
 
 export type UpdateSalonInput = {
   name?: string;
-  slug?: string;
   ownerName?: string;
   ownerEmail?: string;
   ownerPhone?: string;

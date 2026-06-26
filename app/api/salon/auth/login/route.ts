@@ -14,6 +14,12 @@ import {
   mapBackendSalonRoleToFrontend,
   sanitizeSalonUser,
 } from "@/src/lib/auth/salon-permissions";
+import {
+  evaluateSalonSubscriptionAccess,
+  getLatestSubscriptionForSalon,
+  canRoleAccessPlan,
+  buildSubscriptionPayload,
+} from "@/src/lib/subscription-access-service";
 import { SalonUser } from "@/src/models/SalonUser";
 import type { SalonUserRole } from "@/src/constants/salon";
 
@@ -64,6 +70,23 @@ export async function POST(request: Request) {
 
     const backendRole = user.role as SalonUserRole;
     const frontendRole = mapBackendSalonRoleToFrontend(backendRole);
+    const evaluatedSubscription = await evaluateSalonSubscriptionAccess(salonId);
+    const subscription = evaluatedSubscription ?? await getLatestSubscriptionForSalon(salonId);
+    const subscriptionPayload = buildSubscriptionPayload(subscription as Record<string, unknown> | null);
+
+    if (subscriptionPayload && ["access_blocked", "suspended", "cancelled", "expired"].includes(subscriptionPayload.accessStatus)) {
+      return errorResponse(
+        "Your salon access is blocked due to pending subscription payment. Please contact support.",
+        403,
+      );
+    }
+
+    if (subscription && !canRoleAccessPlan(frontendRole, (subscription as Record<string, unknown>).planCode)) {
+      return errorResponse(
+        "Your role is not available on the current subscription plan.",
+        403,
+      );
+    }
 
     const accessToken = signSalonAccessToken({
       userId: String(user._id),
@@ -91,6 +114,7 @@ export async function POST(request: Request) {
           ...safeUser,
           role: frontendRole,
           salonId,
+          subscription: subscriptionPayload,
         },
       },
       "Login successful.",

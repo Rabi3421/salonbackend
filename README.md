@@ -1,6 +1,6 @@
 # SalonBackend — Multi-Tenant Salon Management Platform
 
-Central backend and superadmin dashboard for the Rabivio Salon Management System.
+Central backend and superadmin dashboard for the RNPTECHSOLUTIONS Salon Management System.
 
 ## Architecture
 

@@ -5,7 +5,7 @@ const SalonCustomerSchema = new Schema(
     salonId: { type: String, required: true, trim: true },
     customerNo: { type: String, default: "", trim: true },
     name: { type: String, required: true, trim: true },
-    phone: { type: String, required: true, trim: true },
+    phone: { type: String, default: "", trim: true },
     email: { type: String, default: "", lowercase: true, trim: true },
     gender: {
       type: String,
@@ -23,7 +23,14 @@ const SalonCustomerSchema = new Schema(
     },
     source: {
       type: String,
-      enum: ["dashboard", "website", "phone", "whatsapp", "walk_in", "referral"],
+      enum: [
+        "dashboard",
+        "website",
+        "phone",
+        "whatsapp",
+        "walk_in",
+        "referral",
+      ],
       default: "dashboard",
     },
     favoriteServices: { type: [String], default: [] },
@@ -32,6 +39,11 @@ const SalonCustomerSchema = new Schema(
     notes: { type: String, default: "", trim: true },
     allergies: { type: String, default: "", trim: true },
     hairSkinNotes: { type: String, default: "", trim: true },
+    hasAccount: { type: Boolean, default: false },
+    passwordHash: { type: String, select: false },
+    accountCreatedAt: { type: Date },
+    lastLoginAt: { type: Date },
+    marketingConsent: { type: Boolean, default: false },
     totalVisits: { type: Number, default: 0, min: 0 },
     totalSpent: { type: Number, default: 0, min: 0 },
     dueAmount: { type: Number, default: 0, min: 0 },
@@ -46,6 +58,7 @@ SalonCustomerSchema.index({ salonId: 1, email: 1 });
 SalonCustomerSchema.index({ salonId: 1, name: 1 });
 SalonCustomerSchema.index({ salonId: 1, status: 1 });
 SalonCustomerSchema.index({ salonId: 1, source: 1 });
+SalonCustomerSchema.index({ salonId: 1, hasAccount: 1 });
 SalonCustomerSchema.index({ salonId: 1, createdAt: -1 });
 
 export type SalonCustomerDocument = InferSchemaType<typeof SalonCustomerSchema>;

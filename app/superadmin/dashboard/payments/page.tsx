@@ -106,6 +106,10 @@ export default function PaymentsListPage() {
         </Link>
       </section>
 
+      <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+        Paid subscription payments will automatically reactivate salon access and move next due date to next month&apos;s 5th.
+      </div>
+
       {data?.summary ? (
         <section className="grid grid-cols-4 gap-3 lg:grid-cols-8">
           {SUMMARY_CARDS.map((c) => (

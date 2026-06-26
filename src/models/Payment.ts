@@ -8,7 +8,7 @@ const PaymentSchema = new Schema(
     amount: { type: Number, required: true, min: 0 },
     method: {
       type: String,
-      enum: ["cash", "upi", "bank_transfer", "card", "gateway", "other"],
+      enum: ["cash", "upi", "bank_transfer", "card", "cheque", "gateway", "other"],
       default: "other",
     },
     status: {
@@ -19,6 +19,9 @@ const PaymentSchema = new Schema(
     transactionId: { type: String, default: "", trim: true },
     referenceNote: { type: String, default: "", trim: true },
     paidAt: { type: Date },
+    billingPeriodStart: { type: Date },
+    billingPeriodEnd: { type: Date },
+    receiptNumber: { type: String, default: "", trim: true },
   },
   { timestamps: true },
 );

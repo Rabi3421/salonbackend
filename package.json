@@ -7,11 +7,14 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed:salon-demo": "tsx src/scripts/seed-salon-demo-data.ts"
+    "seed:salon-demo": "tsx src/scripts/seed-salon-demo-data.ts",
+    "seed:salon-plans": "tsx src/scripts/seed-salon-subscription-plans.ts",
+    "backfill:salon-subscriptions": "tsx src/scripts/backfill-salon-subscriptions.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
     "jsonwebtoken": "^9.0.3",
+    "libphonenumber-js": "^1.13.7",
     "mongoose": "^9.7.2",
     "next": "16.2.9",
     "react": "19.2.4",

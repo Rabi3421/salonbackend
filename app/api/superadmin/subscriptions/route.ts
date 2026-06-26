@@ -10,12 +10,18 @@ import {
   calculateSubscriptionAmount,
   syncSalonSubscriptionState,
 } from "@/src/lib/subscription-utils";
+import {
+  getPlanPricing,
+  validateFinalMonthlyPrice,
+} from "@/src/lib/subscription-policy";
+import { getGraceEndForDueDate } from "@/src/lib/subscription-billing-dates";
 import { createAuditLog } from "@/src/lib/audit-log";
 import { AUDIT_ACTIONS } from "@/src/constants/modules";
 import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from "@/src/constants/salon";
 import { Subscription } from "@/src/models/Subscription";
 import { Salon } from "@/src/models/Salon";
 import { Plan } from "@/src/models/Plan";
+import { getFixedSubscriptionPlan } from "@/src/lib/fixed-subscription-plans";
 
 export async function GET(request: NextRequest) {
   try {
@@ -27,6 +33,7 @@ export async function GET(request: NextRequest) {
     const url = request.nextUrl;
     const search = url.searchParams.get("search")?.trim() ?? "";
     const status = url.searchParams.get("status")?.trim() ?? "";
+    const accessStatus = url.searchParams.get("accessStatus")?.trim() ?? "";
     const billingCycle = url.searchParams.get("billingCycle")?.trim() ?? "";
     const salonId = url.searchParams.get("salonId")?.trim() ?? "";
     const planCode = url.searchParams.get("planCode")?.trim() ?? "";
@@ -49,6 +56,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (status) filter.status = status;
+    if (accessStatus) filter.accessStatus = accessStatus;
     if (billingCycle) filter.billingCycle = billingCycle;
     if (salonId) filter.salonId = salonId;
     if (planCode) filter.planCode = planCode.toUpperCase();
@@ -86,7 +94,7 @@ export async function GET(request: NextRequest) {
     });
 
     const summary: Record<string, number> = {
-      total: 0, trial: 0, active: 0, expired: 0, suspended: 0, cancelled: 0, monthly: 0, yearly: 0,
+      total: 0, trial: 0, active: 0, payment_due: 0, grace_period: 0, access_blocked: 0, expired: 0, suspended: 0, cancelled: 0, monthly: 0, yearly: 0,
     };
     for (const s of statusSummary) {
       if (s._id in summary) summary[s._id] = s.count;
@@ -122,7 +130,8 @@ export async function POST(request: NextRequest) {
     const salon = await Salon.findOne({ salonId: input.salonId }).lean();
     if (!salon) return errorResponse("Salon not found.", 404);
 
-    const plan = await Plan.findOne({ planCode: input.planCode, isActive: true }).lean();
+    const plan = await Plan.findOne({ planCode: input.planCode, isActive: true }).lean()
+      ?? getFixedSubscriptionPlan(input.planCode);
     if (!plan) return errorResponse("Active plan not found.", 404);
 
     const planObj = plan as Record<string, unknown>;
@@ -150,6 +159,12 @@ export async function POST(request: NextRequest) {
       amount: input.amount,
     });
 
+    const pricing = getPlanPricing(input.planCode);
+    const priceValidation = validateFinalMonthlyPrice(input.planCode, amount || pricing.standardMonthlyPrice);
+    if (input.billingCycle !== "trial" && !priceValidation.valid) {
+      return errorResponse(priceValidation.error, 400);
+    }
+
     const subStatus = input.billingCycle === "trial" ? "trial" : "active";
 
     const subscription = await Subscription.create({
@@ -162,6 +177,22 @@ export async function POST(request: NextRequest) {
       endDate: dates.endDate,
       nextBillingDate: dates.nextBillingDate,
       amount,
+      planName: String(planObj.name ?? input.planCode),
+      standardMonthlyPrice: pricing.standardMonthlyPrice,
+      finalMonthlyPrice: input.billingCycle === "trial" ? pricing.standardMonthlyPrice : amount,
+      minimumMonthlyPrice: pricing.minimumMonthlyPrice,
+      negotiatedMonthlyPrice: input.amount,
+      priceLockedBySuperadmin: input.amount !== undefined,
+      billingCollectionDay: 5,
+      graceEndDay: 10,
+      trialStartDate: input.billingCycle === "trial" ? dates.startDate : undefined,
+      trialEndDate: input.billingCycle === "trial" ? dates.endDate : undefined,
+      currentDueDate: dates.nextBillingDate,
+      currentGraceEndDate: getGraceEndForDueDate(dates.nextBillingDate),
+      nextDueDate: dates.nextBillingDate,
+      nextGraceEndDate: getGraceEndForDueDate(dates.nextBillingDate),
+      accessStatus: subStatus,
+      paymentStatus: input.billingCycle === "trial" ? "pending" : "paid",
       notes: input.notes ?? "",
     });
 

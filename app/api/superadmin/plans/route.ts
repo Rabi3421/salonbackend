@@ -8,6 +8,7 @@ import { createAuditLog } from "@/src/lib/audit-log";
 import { AUDIT_ACTIONS } from "@/src/constants/modules";
 import { DEFAULT_PAGE_LIMIT, MAX_PAGE_LIMIT } from "@/src/constants/salon";
 import { Plan } from "@/src/models/Plan";
+import { filterFixedSubscriptionPlans } from "@/src/lib/fixed-subscription-plans";
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,12 +42,20 @@ export async function GET(request: NextRequest) {
 
     const skip = (page - 1) * limit;
 
-    const [plans, total, activeCount, inactiveCount] = await Promise.all([
+    let [plans, total, activeCount, inactiveCount] = await Promise.all([
       Plan.find(filter).sort({ createdAt: -1 }).skip(skip).limit(limit).lean(),
       Plan.countDocuments(filter),
       Plan.countDocuments({ isActive: true }),
       Plan.countDocuments({ isActive: false }),
     ]);
+
+    if (activeCount + inactiveCount === 0) {
+      const fixedPlans = filterFixedSubscriptionPlans({ search, status });
+      plans = fixedPlans.slice(skip, skip + limit) as never;
+      total = fixedPlans.length;
+      activeCount = FIXED_ACTIVE_PLAN_COUNT;
+      inactiveCount = 0;
+    }
 
     return successResponse({
       plans,
@@ -66,6 +75,8 @@ export async function GET(request: NextRequest) {
     return errorResponse("Unable to fetch plans.", 500);
   }
 }
+
+const FIXED_ACTIVE_PLAN_COUNT = 2;
 
 export async function POST(request: NextRequest) {
   try {

@@ -1,3 +1,13 @@
+import type {
+  SalonSubscriptionPolicyPayload,
+  SalonSubscriptionPolicySummary,
+  SalonSubscriptionPolicyUpdateResponse,
+  SubscriptionAccessStatus,
+  SubscriptionBlockPayload,
+  SubscriptionEvaluateAccessResponse,
+  SubscriptionReactivatePayload,
+} from "@/src/types/superadmin-frontend";
+
 type ApiResponse<T = unknown> = {
   success: boolean;
   message: string;
@@ -82,6 +92,12 @@ export type SalonRecord = {
   trialEndDate: string;
   currentPlanCode: string;
   subscriptionStatus: string;
+  accessStatus?: SubscriptionAccessStatus | string;
+  subscriptionPlan?: string;
+  nextBillingDate?: string;
+  graceEndDate?: string;
+  finalMonthlyPrice?: number;
+  lastPaymentDate?: string;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
@@ -128,7 +144,6 @@ export type CreateSalonPayload = {
   pincode?: string;
   gstNumber?: string;
   logoUrl?: string;
-  slug?: string;
   trialDays?: number;
   planCode?: string;
 };
@@ -153,12 +168,29 @@ export type SalonDetailData = {
   currentSubscription: {
     subscriptionId: string;
     planCode: string;
+    planName?: string;
     status: string;
+    accessStatus?: SubscriptionAccessStatus;
+    paymentStatus?: string;
     billingCycle: string;
     startDate: string;
     endDate: string;
     nextBillingDate: string;
     amount: number;
+    standardMonthlyPrice?: number;
+    minimumMonthlyPrice?: number;
+    finalMonthlyPrice?: number;
+    negotiatedMonthlyPrice?: number;
+    negotiationNote?: string;
+    priceLockedBySuperadmin?: boolean;
+    trialStartDate?: string;
+    trialEndDate?: string;
+    currentDueDate?: string;
+    currentGraceEndDate?: string;
+    nextDueDate?: string;
+    nextGraceEndDate?: string;
+    lastPaidAt?: string;
+    lastPaymentId?: string;
   } | null;
   payments: {
     totalPayments: number;
@@ -172,7 +204,6 @@ export function getSalon(salonId: string) {
 
 export type UpdateSalonPayload = {
   name?: string;
-  slug?: string;
   ownerName?: string;
   ownerEmail?: string;
   ownerPhone?: string;
@@ -208,6 +239,36 @@ export function updateSalonStatus(salonId: string, payload: StatusPayload) {
   return request<{ salon: SalonRecord }>(
     `/api/superadmin/salons/${salonId}/status`,
     { method: "PATCH", body: JSON.stringify(payload) },
+  );
+}
+
+export function updateSalonSubscriptionPolicy(
+  salonId: string,
+  payload: SalonSubscriptionPolicyPayload,
+) {
+  return request<SalonSubscriptionPolicyUpdateResponse>(
+    `/api/superadmin/salons/${salonId}/subscription-policy`,
+    { method: "PATCH", body: JSON.stringify(payload) },
+  );
+}
+
+export function blockSalonSubscriptionAccess(
+  salonId: string,
+  payload: SubscriptionBlockPayload,
+) {
+  return request<{ subscription: SalonSubscriptionPolicySummary }>(
+    `/api/superadmin/salons/${salonId}/subscription/block`,
+    { method: "POST", body: JSON.stringify(payload) },
+  );
+}
+
+export function reactivateSalonSubscriptionAccess(
+  salonId: string,
+  payload: SubscriptionReactivatePayload,
+) {
+  return request<{ subscription: SalonSubscriptionPolicySummary }>(
+    `/api/superadmin/salons/${salonId}/subscription/reactivate`,
+    { method: "POST", body: JSON.stringify(payload) },
   );
 }
 
@@ -281,6 +342,7 @@ export type PlanRecord = {
   name: string;
   description: string;
   monthlyPrice: number;
+  minimumMonthlyPrice?: number;
   yearlyPrice: number;
   trialDays: number;
   maxStaff: number;
@@ -385,12 +447,23 @@ export type SubscriptionRecord = {
   subscriptionId: string;
   salonId: string;
   planCode: string;
+  planName?: string;
   status: string;
+  accessStatus?: SubscriptionAccessStatus | string;
+  paymentStatus?: string;
   billingCycle: string;
   startDate: string;
   endDate: string;
   nextBillingDate: string;
   amount: number;
+  standardMonthlyPrice?: number;
+  minimumMonthlyPrice?: number;
+  finalMonthlyPrice?: number;
+  negotiatedMonthlyPrice?: number;
+  nextDueDate?: string;
+  nextGraceEndDate?: string;
+  lastPaidAt?: string;
+  lastPaymentId?: string;
   notes: string;
   createdAt: string;
   updatedAt: string;
@@ -402,6 +475,7 @@ export type SubscriptionRecord = {
 export type SubscriptionListParams = {
   search?: string;
   status?: string;
+  accessStatus?: string;
   billingCycle?: string;
   salonId?: string;
   planCode?: string;
@@ -526,6 +600,13 @@ export function changeSubscriptionPlan(
 export function checkExpiredSubscriptions() {
   return request<{ expiredCount: number }>(
     "/api/superadmin/subscriptions/check-expired",
+    { method: "POST" },
+  );
+}
+
+export function evaluateAllSubscriptionAccess() {
+  return request<SubscriptionEvaluateAccessResponse>(
+    "/api/superadmin/subscriptions/evaluate-access",
     { method: "POST" },
   );
 }

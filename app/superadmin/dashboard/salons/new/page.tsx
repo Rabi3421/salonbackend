@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { parsePhoneNumberFromString } from "libphonenumber-js/max";
 
 import {
   createSalon,
@@ -12,6 +13,15 @@ import {
 } from "@/src/lib/superadmin-api";
 import { BUSINESS_TYPES } from "@/src/constants/salon";
 import { CopyButton } from "@/src/components/superadmin/CopyButton";
+
+type Toast = {
+  id: number;
+  message: string;
+  type: "error" | "success";
+};
+
+type FormErrors = Partial<Record<keyof CreateSalonPayload, string>>;
+type BusinessTypeOption = (typeof BUSINESS_TYPES)[number];
 
 function SuccessView({ data }: { data: CreateSalonData }) {
   return (
@@ -39,10 +49,6 @@ function SuccessView({ data }: { data: CreateSalonData }) {
           <div>
             <span className="font-medium text-slate-700">Name:</span>{" "}
             <span className="text-slate-900">{data.salon.name}</span>
-          </div>
-          <div>
-            <span className="font-medium text-slate-700">Slug:</span>{" "}
-            <span className="font-mono text-slate-600">{data.salon.slug}</span>
           </div>
           <div>
             <span className="font-medium text-slate-700">Owner Email:</span>{" "}
@@ -116,17 +122,92 @@ const INITIAL_FORM: CreateSalonPayload = {
   pincode: "",
   gstNumber: "",
   logoUrl: "",
-  slug: "",
   trialDays: undefined,
   planCode: "",
 };
 
+function getIndianMobile(value: string) {
+  const digits = value.replace(/\D/g, "");
+  const withoutCountryCode = digits.startsWith("91") && digits.length > 10 ? digits.slice(2) : digits;
+  const phone = parsePhoneNumberFromString(withoutCountryCode, "IN");
+
+  if (!/^[6-9]\d{9}$/.test(withoutCountryCode) || !phone?.isValid() || phone.getType() !== "MOBILE") {
+    return null;
+  }
+
+  return phone.nationalNumber;
+}
+
+function formatPhoneInput(value: string) {
+  const hasPlus = value.trim().startsWith("+");
+  const digits = value.replace(/\D/g, "").slice(0, hasPlus ? 12 : 10);
+  return hasPlus ? `+${digits}` : digits;
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+function isValidUrl(value: string) {
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol);
+  } catch {
+    return false;
+  }
+}
+
+function isBusinessType(value: string): value is BusinessTypeOption {
+  return BUSINESS_TYPES.includes(value as BusinessTypeOption);
+}
+
+function validateSalonForm(form: CreateSalonPayload) {
+  const errors: FormErrors = {};
+  const name = form.name.trim();
+  const ownerName = form.ownerName.trim();
+  const ownerEmail = form.ownerEmail.trim();
+  const ownerPhone = getIndianMobile(form.ownerPhone);
+  const city = form.city.trim();
+  const state = form.state.trim();
+  const pincode = form.pincode?.trim() ?? "";
+  const gstNumber = form.gstNumber?.trim().toUpperCase() ?? "";
+  const logoUrl = form.logoUrl?.trim() ?? "";
+  const ownerPassword = form.ownerPassword ?? "";
+
+  if (name.length < 2) errors.name = "Salon name must be at least 2 characters.";
+  if (!isBusinessType(form.businessType)) errors.businessType = "Select a valid business type.";
+  if (ownerName.length < 2) errors.ownerName = "Owner name must be at least 2 characters.";
+  if (!isValidEmail(ownerEmail)) errors.ownerEmail = "Enter a valid owner email address.";
+  if (!ownerPhone) errors.ownerPhone = "Enter a valid 10-digit Indian mobile number.";
+  if (ownerPassword && ownerPassword.length < 8) {
+    errors.ownerPassword = "Owner password must be at least 8 characters.";
+  }
+  if (city.length < 2) errors.city = "City must be at least 2 characters.";
+  if (state.length < 2) errors.state = "State must be at least 2 characters.";
+  if (pincode && !/^\d{6}$/.test(pincode)) errors.pincode = "Pincode must be exactly 6 digits.";
+  if (gstNumber && !/^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/.test(gstNumber)) {
+    errors.gstNumber = "Enter a valid 15-character GST number.";
+  }
+  if (logoUrl && !isValidUrl(logoUrl)) errors.logoUrl = "Logo URL must be a valid http or https URL.";
+  if (
+    form.trialDays !== undefined &&
+    (!Number.isInteger(form.trialDays) || form.trialDays < 0 || form.trialDays > 365)
+  ) {
+    errors.trialDays = "Trial days must be a whole number between 0 and 365.";
+  }
+
+  return { errors, ownerPhone };
+}
+
 export default function CreateSalonPage() {
   const [form, setForm] = useState<CreateSalonPayload>({ ...INITIAL_FORM });
+  const [fieldErrors, setFieldErrors] = useState<FormErrors>({});
   const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState("");
+  const [phoneError, setPhoneError] = useState("");
+  const [showOwnerPassword, setShowOwnerPassword] = useState(false);
   const [result, setResult] = useState<CreateSalonData | null>(null);
   const [activePlans, setActivePlans] = useState<PlanRecord[]>([]);
+  const [toasts, setToasts] = useState<Toast[]>([]);
 
   useEffect(() => {
     getPlans({ status: "active", limit: 100 })
@@ -134,19 +215,72 @@ export default function CreateSalonPage() {
       .catch(() => {});
   }, []);
 
-  function updateField(field: string, value: string | number | undefined) {
+  function showToast(message: string, type: Toast["type"] = "error") {
+    const id = Date.now() + Math.random();
+    setToasts((prev) => [...prev, { id, message, type }].slice(-3));
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((toast) => toast.id !== id));
+    }, 4200);
+  }
+
+  function updateField(field: keyof CreateSalonPayload, value: string | number | undefined) {
     setForm((prev) => ({ ...prev, [field]: value }));
+    if (fieldErrors[field]) {
+      setFieldErrors((prev) => {
+        const next = { ...prev };
+        delete next[field];
+        return next;
+      });
+    }
+  }
+
+  function updateOwnerPhone(value: string) {
+    const formatted = formatPhoneInput(value);
+    updateField("ownerPhone", formatted);
+    if (phoneError) setPhoneError("");
+  }
+
+  function inputClass(field: keyof CreateSalonPayload) {
+    return `mt-1 w-full rounded-md border px-3 py-2.5 text-sm outline-none transition focus:ring-2 ${
+      fieldErrors[field]
+        ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
+        : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-500/20"
+    }`;
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setSubmitting(true);
-    setError("");
+    setPhoneError("");
+    setFieldErrors({});
 
     try {
       const payload = { ...form };
+      const validation = validateSalonForm(payload);
+      const messages = Object.values(validation.errors);
+
+      if (messages.length > 0 || !validation.ownerPhone) {
+        setFieldErrors(validation.errors);
+        if (validation.errors.ownerPhone) setPhoneError(validation.errors.ownerPhone);
+        messages.slice(0, 3).forEach((message) => showToast(message));
+        if (messages.length > 3) {
+          showToast(`Please fix ${messages.length - 3} more validation issue(s).`);
+        }
+        setSubmitting(false);
+        return;
+      }
+
+      payload.name = payload.name.trim();
+      payload.ownerName = payload.ownerName.trim();
+      payload.ownerEmail = payload.ownerEmail.trim().toLowerCase();
+      payload.ownerPhone = validation.ownerPhone;
+      payload.city = payload.city.trim();
+      payload.state = payload.state.trim();
+      if (payload.gstNumber) payload.gstNumber = payload.gstNumber.trim().toUpperCase();
+      if (payload.logoUrl) payload.logoUrl = payload.logoUrl.trim();
+      if (payload.address) payload.address = payload.address.trim();
+      if (payload.pincode) payload.pincode = payload.pincode.trim();
       if (!payload.ownerPassword) delete payload.ownerPassword;
-      if (!payload.slug) delete payload.slug;
       if (!payload.planCode) delete payload.planCode;
       if (!payload.gstNumber) delete payload.gstNumber;
       if (!payload.logoUrl) delete payload.logoUrl;
@@ -157,9 +291,11 @@ export default function CreateSalonPage() {
       }
 
       const res = await createSalon(payload);
+      showToast("Salon created successfully.", "success");
       setResult(res.data ?? null);
     } catch (err) {
-      setError((err as Error).message);
+      const message = (err as Error).message;
+      showToast(message);
     } finally {
       setSubmitting(false);
     }
@@ -169,6 +305,21 @@ export default function CreateSalonPage() {
 
   return (
     <div className="space-y-6">
+      <div className="fixed right-5 top-5 z-50 space-y-2">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`w-80 rounded-2xl border px-4 py-3 text-sm font-medium shadow-xl ${
+              toast.type === "success"
+                ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                : "border-red-200 bg-red-50 text-red-800"
+            }`}
+          >
+            {toast.message}
+          </div>
+        ))}
+      </div>
+
       <section>
         <div className="flex items-center gap-2 text-sm text-slate-500">
           <Link
@@ -187,6 +338,7 @@ export default function CreateSalonPage() {
 
       <form
         onSubmit={handleSubmit}
+        noValidate
         className="rounded-2xl border border-slate-200/80 bg-white shadow-sm"
       >
         <div className="space-y-6 p-6">
@@ -204,8 +356,7 @@ export default function CreateSalonPage() {
                   type="text"
                   value={form.name}
                   onChange={(e) => updateField("name", e.target.value)}
-                  required
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  className={inputClass("name")}
                 />
               </div>
               <div>
@@ -215,8 +366,7 @@ export default function CreateSalonPage() {
                 <select
                   value={form.businessType}
                   onChange={(e) => updateField("businessType", e.target.value)}
-                  required
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  className={inputClass("businessType")}
                 >
                   {BUSINESS_TYPES.map((bt) => (
                     <option key={bt} value={bt}>
@@ -225,19 +375,6 @@ export default function CreateSalonPage() {
                   ))}
                 </select>
               </div>
-            </div>
-
-            <div>
-              <label className="text-sm font-medium text-slate-700">
-                Custom Slug
-              </label>
-              <input
-                type="text"
-                value={form.slug ?? ""}
-                onChange={(e) => updateField("slug", e.target.value)}
-                placeholder="Auto-generated if empty"
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-              />
             </div>
           </fieldset>
 
@@ -255,8 +392,7 @@ export default function CreateSalonPage() {
                   type="text"
                   value={form.ownerName}
                   onChange={(e) => updateField("ownerName", e.target.value)}
-                  required
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  className={inputClass("ownerName")}
                 />
               </div>
               <div>
@@ -267,8 +403,7 @@ export default function CreateSalonPage() {
                   type="email"
                   value={form.ownerEmail}
                   onChange={(e) => updateField("ownerEmail", e.target.value)}
-                  required
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  className={inputClass("ownerEmail")}
                 />
               </div>
               <div>
@@ -278,23 +413,68 @@ export default function CreateSalonPage() {
                 <input
                   type="tel"
                   value={form.ownerPhone}
-                  onChange={(e) => updateField("ownerPhone", e.target.value)}
+                  onChange={(e) => updateOwnerPhone(e.target.value)}
+                  onBlur={() => {
+                    if (form.ownerPhone && !getIndianMobile(form.ownerPhone)) {
+                      setPhoneError("Enter a valid 10-digit Indian mobile number.");
+                    }
+                  }}
                   placeholder="10-digit Indian mobile"
-                  required
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  pattern="[0-9+]{10,13}"
+                  className={`mt-1 w-full rounded-md border px-3 py-2.5 text-sm outline-none transition focus:ring-2 ${
+                    phoneError || fieldErrors.ownerPhone
+                      ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
+                      : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-500/20"
+                  }`}
                 />
+                {phoneError ? (
+                  <p className="mt-1 text-xs font-medium text-red-600">{phoneError}</p>
+                ) : (
+                  <p className="mt-1 text-xs text-slate-400">
+                    Use a valid Indian mobile number, e.g. 9876543210.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-sm font-medium text-slate-700">
                   Owner Password
                 </label>
-                <input
-                  type="password"
-                  value={form.ownerPassword ?? ""}
-                  onChange={(e) => updateField("ownerPassword", e.target.value)}
-                  placeholder="Auto-generated if empty"
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
-                />
+                <div className="relative mt-1">
+                  <input
+                    type={showOwnerPassword ? "text" : "password"}
+                    value={form.ownerPassword ?? ""}
+                    onChange={(e) => updateField("ownerPassword", e.target.value)}
+                    placeholder="Auto-generated if empty"
+                    className={`w-full rounded-md border px-3 py-2.5 pr-12 text-sm outline-none transition focus:ring-2 ${
+                      fieldErrors.ownerPassword
+                        ? "border-red-300 focus:border-red-500 focus:ring-red-500/20"
+                        : "border-slate-300 focus:border-indigo-500 focus:ring-indigo-500/20"
+                    }`}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowOwnerPassword((value) => !value)}
+                    className="absolute right-2 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                    aria-label={showOwnerPassword ? "Hide owner password" : "Show owner password"}
+                    title={showOwnerPassword ? "Hide password" : "Show password"}
+                  >
+                    {showOwnerPassword ? (
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path d="M3 3l18 18" />
+                        <path d="M10.58 10.58A2 2 0 0012 14a2 2 0 001.42-.58" />
+                        <path d="M9.88 5.09A10.4 10.4 0 0112 5c5 0 9 5 9 7a8.7 8.7 0 01-2.2 3.35" />
+                        <path d="M6.61 6.61C4.42 8.06 3 10.22 3 12c0 2 4 7 9 7a9.77 9.77 0 004.39-1.06" />
+                      </svg>
+                    ) : (
+                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                        <path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z" />
+                        <circle cx="12" cy="12" r="3" />
+                      </svg>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </fieldset>
@@ -312,7 +492,7 @@ export default function CreateSalonPage() {
                 type="text"
                 value={form.address ?? ""}
                 onChange={(e) => updateField("address", e.target.value)}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                className={inputClass("address")}
               />
             </div>
 
@@ -325,8 +505,7 @@ export default function CreateSalonPage() {
                   type="text"
                   value={form.city}
                   onChange={(e) => updateField("city", e.target.value)}
-                  required
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  className={inputClass("city")}
                 />
               </div>
               <div>
@@ -337,8 +516,7 @@ export default function CreateSalonPage() {
                   type="text"
                   value={form.state}
                   onChange={(e) => updateField("state", e.target.value)}
-                  required
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  className={inputClass("state")}
                 />
               </div>
               <div>
@@ -348,10 +526,12 @@ export default function CreateSalonPage() {
                 <input
                   type="text"
                   value={form.pincode ?? ""}
-                  onChange={(e) => updateField("pincode", e.target.value)}
+                  onChange={(e) => updateField("pincode", e.target.value.replace(/\D/g, "").slice(0, 6))}
                   placeholder="6 digits"
+                  inputMode="numeric"
+                  pattern="[0-9]{6}"
                   maxLength={6}
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  className={inputClass("pincode")}
                 />
               </div>
             </div>
@@ -370,8 +550,8 @@ export default function CreateSalonPage() {
                 <input
                   type="text"
                   value={form.gstNumber ?? ""}
-                  onChange={(e) => updateField("gstNumber", e.target.value)}
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  onChange={(e) => updateField("gstNumber", e.target.value.toUpperCase())}
+                  className={inputClass("gstNumber")}
                 />
               </div>
               <div>
@@ -389,7 +569,7 @@ export default function CreateSalonPage() {
                   }
                   placeholder="Default: 14"
                   min={0}
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  className={inputClass("trialDays")}
                 />
               </div>
               <div>
@@ -399,7 +579,7 @@ export default function CreateSalonPage() {
                 <select
                   value={form.planCode ?? ""}
                   onChange={(e) => updateField("planCode", e.target.value)}
-                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                  className={inputClass("planCode")}
                 >
                   <option value="">Trial (no plan)</option>
                   {activePlans.map((p) => (
@@ -419,17 +599,11 @@ export default function CreateSalonPage() {
                 type="url"
                 value={form.logoUrl ?? ""}
                 onChange={(e) => updateField("logoUrl", e.target.value)}
-                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                className={inputClass("logoUrl")}
               />
             </div>
           </fieldset>
         </div>
-
-        {error ? (
-          <div className="mx-6 mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-            {error}
-          </div>
-        ) : null}
 
         <div className="flex items-center justify-end gap-3 border-t border-slate-200 px-6 py-4">
           <Link

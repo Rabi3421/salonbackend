@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { errorResponse, successResponse } from "@/src/lib/api-response";
 import { requireSalonUser } from "@/src/lib/auth/require-salon-user";
+import { buildSubscriptionPayload } from "@/src/lib/subscription-access-service";
 
 export async function GET(request: Request) {
   try {
@@ -17,6 +18,8 @@ export async function GET(request: Request) {
         role: auth.frontendRole,
         salonId: auth.salon.salonId,
         isActive: true,
+        subscription: buildSubscriptionPayload(auth.subscription ?? null),
+        subscriptionWarning: auth.subscriptionWarning ?? "",
       },
     });
   } catch {

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 
 import { LogoutButton } from "@/src/components/superadmin/LogoutButton";
@@ -36,6 +37,35 @@ export default function SuperadminDashboardLayout({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
+  const [superadminEmail, setSuperadminEmail] = useState("");
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function loadProfile() {
+      try {
+        const response = await fetch("/api/superadmin/auth/me");
+        const result = (await response.json()) as {
+          success?: boolean;
+          data?: { user?: { email?: string } };
+        };
+
+        if (mounted && response.ok && result.success) {
+          setSuperadminEmail(result.data?.user?.email ?? "");
+        }
+      } catch {
+        if (mounted) setSuperadminEmail("");
+      }
+    }
+
+    loadProfile();
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   function isActive(href: string) {
     if (href === "/superadmin/dashboard") return pathname === href;
@@ -45,27 +75,62 @@ export default function SuperadminDashboardLayout({
   return (
     <div className="h-screen overflow-hidden bg-slate-100/60 text-slate-900">
       <div className="flex h-screen">
-        <aside className="hidden w-60 flex-shrink-0 flex-col overflow-y-auto bg-white lg:flex">
-          <div className="px-5 py-5">
-            <div className="flex items-center gap-2.5">
-              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-sm font-bold text-white shadow-md shadow-indigo-200">
-                R
-              </div>
-              <div>
-                <p className="text-sm font-bold text-slate-900">Rabivio</p>
-                <p className="text-[11px] text-slate-400">Superadmin</p>
+        <aside
+          className={`relative hidden flex-shrink-0 flex-col overflow-visible border-r border-slate-100 bg-white transition-[width] duration-200 lg:flex ${
+            sidebarCollapsed ? "w-20" : "w-60"
+          }`}
+        >
+          <div className={sidebarCollapsed ? "px-3 py-5" : "px-5 py-5"}>
+            <div
+              className={`flex items-center ${
+                sidebarCollapsed ? "justify-center" : "gap-2.5"
+              }`}
+            >
+              <div className="flex min-w-0 items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-indigo-600 text-sm font-bold text-white shadow-md shadow-indigo-200">
+                  R
+                </div>
+                <div className={sidebarCollapsed ? "hidden" : "block"}>
+                  <p className="max-w-40 truncate text-sm font-bold text-slate-900">
+                    RNPTECHSOLUTIONS
+                  </p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-400">
+                    SALON MANAGEMENT
+                  </p>
+                </div>
               </div>
             </div>
           </div>
 
-          <nav className="flex-1 space-y-1 px-3 py-2">
+          <button
+            type="button"
+            onClick={() => setSidebarCollapsed((value) => !value)}
+            className="absolute -right-4 top-6 z-20 hidden h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-md shadow-slate-200/70 transition hover:bg-slate-50 hover:text-slate-800 lg:flex"
+            aria-label={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+            title={sidebarCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+          >
+            <svg
+              className={`h-4 w-4 transition-transform ${sidebarCollapsed ? "rotate-180" : ""}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path d="M15 18l-6-6 6-6" />
+            </svg>
+          </button>
+
+          <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-2">
             {navigationItems.map((item) => {
               const active = isActive(item.href);
               return (
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-[13px] font-medium transition ${
+                  title={sidebarCollapsed ? item.label : undefined}
+                  className={`flex items-center rounded-xl py-2.5 text-[13px] font-medium transition ${
+                    sidebarCollapsed ? "justify-center px-0" : "gap-3 px-3"
+                  } ${
                     active
                       ? "bg-indigo-600 text-white shadow-md shadow-indigo-200"
                       : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
@@ -74,15 +139,12 @@ export default function SuperadminDashboardLayout({
                   <span className={active ? "text-white" : "text-slate-400"}>
                     {ICONS[item.icon]}
                   </span>
-                  {item.label}
+                  {sidebarCollapsed ? null : item.label}
                 </Link>
               );
             })}
           </nav>
 
-          <div className="border-t border-slate-100 px-3 py-4">
-            <LogoutButton />
-          </div>
         </aside>
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
@@ -92,7 +154,12 @@ export default function SuperadminDashboardLayout({
                 <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-xs font-bold text-white">
                   R
                 </div>
-                <span className="text-sm font-bold text-slate-900">Rabivio</span>
+                <div>
+                  <p className="text-sm font-bold text-slate-900">RNPTECHSOLUTIONS</p>
+                  <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                    SALON MANAGEMENT
+                  </p>
+                </div>
               </div>
 
               <div className="hidden flex-1 lg:block">
@@ -108,15 +175,47 @@ export default function SuperadminDashboardLayout({
                 </div>
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="hidden items-center gap-2 lg:flex">
-                  <div className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-600">
+              <div className="relative flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setProfileOpen((value) => !value)}
+                  className="flex items-center gap-2 rounded-full bg-indigo-100 p-1 pr-3 text-sm font-semibold text-indigo-700 transition hover:bg-indigo-200"
+                  aria-expanded={profileOpen}
+                  aria-haspopup="menu"
+                >
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">
                     SA
+                  </span>
+                  <span className="hidden text-xs lg:inline">Superadmin</span>
+                  <svg
+                    className={`hidden h-3.5 w-3.5 transition-transform lg:block ${
+                      profileOpen ? "rotate-180" : ""
+                    }`}
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth={2}
+                  >
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </button>
+
+                {profileOpen ? (
+                  <div
+                    role="menu"
+                    className="absolute right-0 top-12 z-30 w-64 rounded-2xl border border-slate-200 bg-white p-2 shadow-xl shadow-slate-200/70"
+                  >
+                    <div className="border-b border-slate-100 px-3 py-3">
+                      <p className="text-sm font-bold text-slate-900">Superadmin Dashboard</p>
+                      <p className="mt-1 text-xs text-slate-400">
+                        {superadminEmail || "Platform administration"}
+                      </p>
+                    </div>
+                    <div className="pt-2" onClick={() => setProfileOpen(false)}>
+                      <LogoutButton />
+                    </div>
                   </div>
-                </div>
-                <div className="lg:hidden">
-                  <LogoutButton />
-                </div>
+                ) : null}
               </div>
             </div>
 

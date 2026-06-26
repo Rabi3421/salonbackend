@@ -24,17 +24,21 @@ export async function resolveSalonFromRequest(
 
   const salonObj = salon as Record<string, unknown>;
 
-  if (salonObj.accountStatus === "cancelled") {
+  const accessStatus = String(salonObj.accessStatus || salonObj.accountStatus || "");
+
+  if (["cancelled", "suspended", "access_blocked"].includes(accessStatus)) {
     return {
       success: false,
-      error: "Salon account has been cancelled.",
+      error: "Salon account is not active.",
       status: 403,
     };
   }
 
   if (
-    salonObj.accountStatus !== "active" &&
-    salonObj.accountStatus !== "trial"
+    accessStatus !== "active" &&
+    accessStatus !== "trial" &&
+    accessStatus !== "payment_due" &&
+    accessStatus !== "grace_period"
   ) {
     return {
       success: false,

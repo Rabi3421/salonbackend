@@ -7,6 +7,7 @@ import {
   getSubscriptions,
   cancelSubscription,
   checkExpiredSubscriptions,
+  evaluateAllSubscriptionAccess,
   type SubscriptionListData,
   type SubscriptionListParams,
 } from "@/src/lib/superadmin-api";
@@ -16,6 +17,13 @@ import { LoadingState } from "@/src/components/superadmin/LoadingState";
 import { ErrorState } from "@/src/components/superadmin/ErrorState";
 import { EmptyState } from "@/src/components/superadmin/EmptyState";
 import { ConfirmDialog } from "@/src/components/superadmin/ConfirmDialog";
+import {
+  formatAccessStatus,
+  formatCurrencyINR,
+  formatNullableDate,
+  formatPlanCode,
+} from "@/src/lib/formatters";
+import type { SubscriptionAccessStatus } from "@/src/types/superadmin-frontend";
 
 type FS = { data: SubscriptionListData | null; loading: boolean; error: string; key: number };
 type FA = { type: "OK"; data: SubscriptionListData } | { type: "ERR"; error: string } | { type: "RE" };
@@ -23,13 +31,6 @@ function fr(s: FS, a: FA): FS {
   if (a.type === "OK") return { ...s, data: a.data, error: "", loading: false };
   if (a.type === "ERR") return { ...s, error: a.error, loading: false };
   return { ...s, loading: true, error: "", key: s.key + 1 };
-}
-
-function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-}
-function fmtPrice(n: number) {
-  return new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(n);
 }
 
 const CARDS: { label: string; key: string; color: string }[] = [
@@ -43,10 +44,44 @@ const CARDS: { label: string; key: string; color: string }[] = [
   { label: "Yearly", key: "yearly", color: "text-slate-600" },
 ];
 
+const ACCESS_STATUSES: SubscriptionAccessStatus[] = [
+  "trial",
+  "active",
+  "payment_due",
+  "grace_period",
+  "access_blocked",
+  "expired",
+  "suspended",
+  "cancelled",
+];
+
+function getAccessBadgeClass(status?: string | null) {
+  const styles: Record<string, string> = {
+    trial: "border-blue-200 bg-blue-50 text-blue-700",
+    active: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    payment_due: "border-yellow-200 bg-yellow-50 text-yellow-700",
+    grace_period: "border-orange-200 bg-orange-50 text-orange-700",
+    access_blocked: "border-red-200 bg-red-50 text-red-700",
+    suspended: "border-red-200 bg-red-50 text-red-700",
+    cancelled: "border-slate-200 bg-slate-100 text-slate-600",
+    expired: "border-slate-200 bg-slate-100 text-slate-600",
+  };
+  return styles[status ?? ""] ?? "border-slate-200 bg-slate-50 text-slate-600";
+}
+
+function AccessStatusBadge({ value }: { value?: string | null }) {
+  return (
+    <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-medium ${getAccessBadgeClass(value)}`}>
+      {formatAccessStatus(value)}
+    </span>
+  );
+}
+
 export default function SubscriptionsListPage() {
   const [st, dp] = useReducer(fr, { data: null, loading: true, error: "", key: 0 });
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [accessStatus, setAccessStatus] = useState("");
   const [cycle, setCycle] = useState("");
   const [page, setPage] = useState(1);
 
@@ -54,16 +89,18 @@ export default function SubscriptionsListPage() {
   const [cancelling, setCancelling] = useState(false);
   const [checking, setChecking] = useState(false);
   const [checkMsg, setCheckMsg] = useState("");
+  const [evaluating, setEvaluating] = useState(false);
 
   useEffect(() => {
     const p: SubscriptionListParams = { page, limit: 20 };
     if (search) p.search = search;
     if (status) p.status = status;
+    if (accessStatus) p.accessStatus = accessStatus;
     if (cycle) p.billingCycle = cycle;
     getSubscriptions(p)
       .then((r) => dp({ type: "OK", data: r.data! }))
       .catch((e: Error) => dp({ type: "ERR", error: e.message }));
-  }, [search, status, cycle, page, st.key]);
+  }, [search, status, accessStatus, cycle, page, st.key]);
 
   async function handleCancel() {
     if (!cancelTarget) return;
@@ -82,6 +119,20 @@ export default function SubscriptionsListPage() {
     finally { setChecking(false); }
   }
 
+  async function handleEvaluateAccess() {
+    if (!window.confirm("Evaluate overdue subscription access now?")) return;
+    setEvaluating(true); setCheckMsg("");
+    try {
+      const r = await evaluateAllSubscriptionAccess();
+      const summary = r.data!;
+      setCheckMsg(
+        `Access evaluation complete. Checked ${summary.checked}, active ${summary.active}, trial ${summary.trial}, grace period ${summary.gracePeriod}, blocked ${summary.blocked}.`,
+      );
+      dp({ type: "RE" });
+    } catch (e) { setCheckMsg((e as Error).message); }
+    finally { setEvaluating(false); }
+  }
+
   const { data, loading, error } = st;
 
   return (
@@ -95,6 +146,10 @@ export default function SubscriptionsListPage() {
           <button type="button" onClick={handleCheckExpired} disabled={checking}
             className="shrink-0 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-60">
             {checking ? "Checking..." : "Check Expired"}
+          </button>
+          <button type="button" onClick={handleEvaluateAccess} disabled={evaluating}
+            className="shrink-0 rounded-xl border border-amber-200 px-4 py-2 text-sm font-medium text-amber-700 shadow-sm transition hover:bg-amber-50 disabled:opacity-60">
+            {evaluating ? "Evaluating..." : "Evaluate Overdue Access"}
           </button>
           <Link href="/superadmin/dashboard/subscriptions/new"
             className="shrink-0 rounded-xl bg-indigo-600 px-4 py-2 text-center text-sm font-medium text-white transition hover:bg-indigo-700">
@@ -132,6 +187,11 @@ export default function SubscriptionsListPage() {
               <option value="">All statuses</option>
               {SUBSCRIPTION_STATUSES.map((s) => (<option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>))}
             </select>
+            <select value={accessStatus} onChange={(e) => { setAccessStatus(e.target.value); setPage(1); }}
+              className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
+              <option value="">All access</option>
+              {ACCESS_STATUSES.map((s) => (<option key={s} value={s}>{formatAccessStatus(s)}</option>))}
+            </select>
             <select value={cycle} onChange={(e) => { setCycle(e.target.value); setPage(1); }}
               className="rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20">
               <option value="">All cycles</option>
@@ -153,8 +213,12 @@ export default function SubscriptionsListPage() {
                     <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Salon</th>
                     <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Plan</th>
                     <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Status</th>
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Access Status</th>
                     <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Cycle</th>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Amount</th>
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Final Monthly Price</th>
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Next Due Date</th>
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Grace End Date</th>
+                    <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Payment Status</th>
                     <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Start</th>
                     <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">End</th>
                     <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Actions</th>
@@ -168,12 +232,16 @@ export default function SubscriptionsListPage() {
                         <div className="font-medium text-slate-900">{sub.salonName || sub.salonId}</div>
                         <div className="text-xs text-slate-500">{sub.salonId}</div>
                       </td>
-                      <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-slate-600">{sub.planCode}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatPlanCode(sub.planCode)}</td>
                       <td className="whitespace-nowrap px-4 py-3"><StatusBadge value={sub.status} type="account" /></td>
+                      <td className="whitespace-nowrap px-4 py-3"><AccessStatusBadge value={sub.accessStatus ?? sub.status} /></td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600 capitalize">{sub.billingCycle}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-700">{fmtPrice(sub.amount)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500">{fmtDate(sub.startDate)}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500">{fmtDate(sub.endDate)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-700">{formatCurrencyINR(sub.finalMonthlyPrice ?? sub.amount)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500">{formatNullableDate(sub.nextDueDate ?? sub.nextBillingDate)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500">{formatNullableDate(sub.nextGraceEndDate)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-slate-600 capitalize">{sub.paymentStatus?.replace(/_/g, " ") ?? "N/A"}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500">{formatNullableDate(sub.startDate)}</td>
+                      <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500">{formatNullableDate(sub.endDate)}</td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <div className="flex gap-1">
                           <Link href={`/superadmin/dashboard/subscriptions/${sub.subscriptionId}`}
@@ -182,6 +250,8 @@ export default function SubscriptionsListPage() {
                             className="rounded border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-50">Renew</Link>
                           <Link href={`/superadmin/dashboard/subscriptions/${sub.subscriptionId}/change-plan`}
                             className="rounded border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-50">Plan</Link>
+                          <Link href={`/superadmin/dashboard/salons/${sub.salonId}`}
+                            className="rounded border border-indigo-200 px-2 py-1 text-xs font-medium text-indigo-600 transition hover:bg-indigo-50">Manage</Link>
                           {sub.status !== "cancelled" ? (
                             <button type="button" onClick={() => setCancelTarget(sub.subscriptionId)}
                               className="rounded border border-red-200 px-2 py-1 text-xs font-medium text-red-600 transition hover:bg-red-50">Cancel</button>

@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { errorResponse, successResponse } from "@/src/lib/api-response";
 import { requireSalonUser } from "@/src/lib/auth/require-salon-user";
 import { getDashboardOverviewByRole } from "@/src/lib/dashboard/salon-overview";
+import { buildSubscriptionPayload } from "@/src/lib/subscription-access-service";
 
 export async function GET(request: Request) {
   try {
@@ -23,6 +24,8 @@ export async function GET(request: Request) {
 
     return successResponse({
       ...overview,
+      subscription: buildSubscriptionPayload(auth.subscription ?? null),
+      subscriptionWarning: auth.subscriptionWarning ?? "",
     });
   } catch {
     return errorResponse("Unable to load dashboard overview.", 500);
