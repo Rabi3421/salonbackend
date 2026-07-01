@@ -13,6 +13,11 @@ import { ACTOR_TYPES } from "@/src/constants/modules";
 import { LoadingState } from "@/src/components/superadmin/LoadingState";
 import { ErrorState } from "@/src/components/superadmin/ErrorState";
 import { EmptyState } from "@/src/components/superadmin/EmptyState";
+import {
+  readInitialSuperadminSearch,
+  SUPERADMIN_HEADER_SEARCH_EVENT,
+  type SuperadminHeaderSearchDetail,
+} from "@/src/lib/superadmin-header-search";
 
 type FS = { data: AuditLogListData | null; loading: boolean; error: string; key: number };
 type FA = { type: "OK"; data: AuditLogListData } | { type: "ERR"; error: string } | { type: "RE" };
@@ -55,7 +60,7 @@ const CARDS: { label: string; key: string; color: string }[] = [
 
 export default function AuditLogsPage() {
   const [st, dp] = useReducer(fr, { data: null, loading: true, error: "", key: 0 });
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(readInitialSuperadminSearch);
   const [actorType, setActorType] = useState("");
   const [category, setCategory] = useState("");
   const [page, setPage] = useState(1);
@@ -70,15 +75,22 @@ export default function AuditLogsPage() {
       .catch((e: Error) => dp({ type: "ERR", error: e.message }));
   }, [search, actorType, category, page, st.key]);
 
+  useEffect(() => {
+    function handleHeaderSearch(event: Event) {
+      const detail = (event as CustomEvent<SuperadminHeaderSearchDetail>).detail;
+      if (detail?.section !== "audit-logs") return;
+      setSearch(detail.search);
+      setPage(1);
+    }
+
+    window.addEventListener(SUPERADMIN_HEADER_SEARCH_EVENT, handleHeaderSearch);
+    return () => window.removeEventListener(SUPERADMIN_HEADER_SEARCH_EVENT, handleHeaderSearch);
+  }, []);
+
   const { data, loading, error } = st;
 
   return (
     <div className="space-y-6">
-      <section>
-        <p className="text-sm font-medium text-indigo-600">Audit Logs</p>
-        <h1 className="mt-1 text-2xl font-semibold text-slate-900">Activity Log</h1>
-      </section>
-
       {data?.summary ? (
         <section className="grid grid-cols-4 gap-3 lg:grid-cols-8">
           {CARDS.map((c) => (

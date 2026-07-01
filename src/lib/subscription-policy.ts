@@ -75,14 +75,13 @@ export const PLAN_FEATURES = {
 } as const;
 
 export const ROLE_ACCESS_BY_PLAN: Record<BusinessPlanCode, SalonUserRole[]> = {
-  basic: ["salon_owner", "salon_admin", "manager", "stylist"],
+  basic: ["salon_owner", "manager", "stylist"],
   premium: [
     "salon_owner",
-    "salon_admin",
     "manager",
     "receptionist",
     "stylist",
-    "cashier",
+    "accountant",
   ],
 };
 

@@ -15,6 +15,11 @@ import { LoadingState } from "@/src/components/superadmin/LoadingState";
 import { ErrorState } from "@/src/components/superadmin/ErrorState";
 import { EmptyState } from "@/src/components/superadmin/EmptyState";
 import { ConfirmDialog } from "@/src/components/superadmin/ConfirmDialog";
+import {
+  readInitialSuperadminSearch,
+  SUPERADMIN_HEADER_SEARCH_EVENT,
+  type SuperadminHeaderSearchDetail,
+} from "@/src/lib/superadmin-header-search";
 
 type FS = { data: EnquiryListData | null; loading: boolean; error: string; key: number };
 type FA = { type: "OK"; data: EnquiryListData } | { type: "ERR"; error: string } | { type: "RE" };
@@ -61,7 +66,7 @@ const CARDS: { label: string; key: string; color: string }[] = [
 
 export default function EnquiriesListPage() {
   const [st, dp] = useReducer(fr, { data: null, loading: true, error: "", key: 0 });
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(readInitialSuperadminSearch);
   const [status, setStatus] = useState("");
   const [type, setType] = useState("");
   const [priority, setPriority] = useState("");
@@ -80,6 +85,18 @@ export default function EnquiriesListPage() {
       .then((r) => dp({ type: "OK", data: r.data! }))
       .catch((e: Error) => dp({ type: "ERR", error: e.message }));
   }, [search, status, type, priority, page, st.key]);
+
+  useEffect(() => {
+    function handleHeaderSearch(event: Event) {
+      const detail = (event as CustomEvent<SuperadminHeaderSearchDetail>).detail;
+      if (detail?.section !== "enquiries") return;
+      setSearch(detail.search);
+      setPage(1);
+    }
+
+    window.addEventListener(SUPERADMIN_HEADER_SEARCH_EVENT, handleHeaderSearch);
+    return () => window.removeEventListener(SUPERADMIN_HEADER_SEARCH_EVENT, handleHeaderSearch);
+  }, []);
 
   async function handleAction() {
     if (!actionTarget) return;
@@ -102,11 +119,7 @@ export default function EnquiriesListPage() {
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-indigo-600">Enquiries</p>
-          <h1 className="mt-1 text-2xl font-semibold text-slate-900">Manage Enquiries</h1>
-        </div>
+      <section className="flex justify-end">
         <Link href="/superadmin/dashboard/enquiries/new"
           className="shrink-0 rounded-xl bg-indigo-600 px-4 py-2 text-center text-sm font-medium text-white transition hover:bg-indigo-700">
           Add Enquiry

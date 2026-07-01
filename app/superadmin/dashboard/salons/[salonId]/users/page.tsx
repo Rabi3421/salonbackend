@@ -12,13 +12,11 @@ import {
   type SalonUserRecord,
   type CreateSalonUserPayload,
 } from "@/src/lib/superadmin-api";
-import { SALON_USER_ROLES } from "@/src/constants/salon";
 import { StatusBadge } from "@/src/components/superadmin/StatusBadge";
 import { CopyButton } from "@/src/components/superadmin/CopyButton";
 import { LoadingState } from "@/src/components/superadmin/LoadingState";
 import { ErrorState } from "@/src/components/superadmin/ErrorState";
 import { EmptyState } from "@/src/components/superadmin/EmptyState";
-import { ConfirmDialog } from "@/src/components/superadmin/ConfirmDialog";
 
 type UsersState = {
   salonName: string;
@@ -61,6 +59,14 @@ const INITIAL_USER_FORM: CreateSalonUserPayload = {
   password: "",
 };
 
+const USER_ROLE_OPTIONS = [
+  { value: "salon_owner", label: "Salon Owner" },
+  { value: "manager", label: "Manager" },
+  { value: "receptionist", label: "Receptionist" },
+  { value: "stylist", label: "Stylist" },
+  { value: "accountant", label: "Accountant" },
+];
+
 export default function SalonUsersPage() {
   const params = useParams<{ salonId: string }>();
   const salonId = params.salonId;
@@ -84,7 +90,11 @@ export default function SalonUsersPage() {
 
   const [resetTarget, setResetTarget] = useState<SalonUserRecord | null>(null);
   const [resetting, setResetting] = useState(false);
-  const [resetPassword, setResetPassword] = useState("");
+  const [resetNewPassword, setResetNewPassword] = useState("");
+  const [resetConfirmPassword, setResetConfirmPassword] = useState("");
+  const [resetError, setResetError] = useState("");
+  const [resetMessage, setResetMessage] = useState("");
+  const [resetGeneratedPassword, setResetGeneratedPassword] = useState("");
 
   useEffect(() => {
     Promise.all([getSalon(salonId), getSalonUsers(salonId)])
@@ -129,21 +139,74 @@ export default function SalonUsersPage() {
     }
   }
 
-  async function handleResetPassword() {
+  function openResetDialog(user: SalonUserRecord) {
+    setResetTarget(user);
+    setResetNewPassword("");
+    setResetConfirmPassword("");
+    setResetError("");
+    setResetMessage("");
+    setResetGeneratedPassword("");
+  }
+
+  function closeResetDialog() {
+    if (resetting) return;
+    setResetTarget(null);
+    setResetNewPassword("");
+    setResetConfirmPassword("");
+    setResetError("");
+    setResetGeneratedPassword("");
+  }
+
+  async function handleResetPassword(e: React.FormEvent) {
+    e.preventDefault();
     if (!resetTarget) return;
+
+    const password = resetNewPassword.trim();
+
+    if (password.length < 6) {
+      setResetError("Password must be at least 6 characters.");
+      return;
+    }
+
+    if (password !== resetConfirmPassword.trim()) {
+      setResetError("Passwords do not match.");
+      return;
+    }
+
     setResetting(true);
+    setResetError("");
+
+    try {
+      await resetSalonUserPassword(salonId, resetTarget._id, {
+        newPassword: password,
+      });
+      setResetMessage(`Password updated for ${resetTarget.email}.`);
+      setResetTarget(null);
+      setResetNewPassword("");
+      setResetConfirmPassword("");
+    } catch (err) {
+      setResetError((err as Error).message);
+    } finally {
+      setResetting(false);
+    }
+  }
+
+  async function handleGenerateResetPassword() {
+    if (!resetTarget) return;
+
+    setResetting(true);
+    setResetError("");
+    setResetGeneratedPassword("");
 
     try {
       const res = await resetSalonUserPassword(salonId, resetTarget._id);
 
       if (res.data?.temporaryPassword) {
-        setResetPassword(res.data.temporaryPassword);
+        setResetGeneratedPassword(res.data.temporaryPassword);
+        setResetMessage("");
       }
-
-      setResetTarget(null);
     } catch (err) {
-      dispatch({ type: "FETCH_ERROR", error: (err as Error).message });
-      setResetTarget(null);
+      setResetError((err as Error).message);
     } finally {
       setResetting(false);
     }
@@ -217,24 +280,16 @@ export default function SalonUsersPage() {
         </div>
       ) : null}
 
-      {resetPassword ? (
-        <div className="rounded-lg border border-amber-200 bg-amber-50 p-5">
-          <h3 className="text-sm font-semibold text-amber-800">
-            New temporary password
+      {resetMessage ? (
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-5">
+          <h3 className="text-sm font-semibold text-emerald-800">
+            Password reset successfully
           </h3>
-          <p className="mt-1 text-xs text-amber-700">
-            This password is shown only once. Copy it now.
-          </p>
-          <div className="mt-3 flex items-center gap-2">
-            <code className="rounded bg-white px-3 py-1.5 font-mono text-sm text-slate-900">
-              {resetPassword}
-            </code>
-            <CopyButton text={resetPassword} />
-          </div>
+          <p className="mt-1 text-xs text-emerald-700">{resetMessage}</p>
           <button
             type="button"
-            onClick={() => setResetPassword("")}
-            className="mt-3 text-xs font-medium text-amber-700 underline"
+            onClick={() => setResetMessage("")}
+            className="mt-3 text-xs font-medium text-emerald-700 underline"
           >
             Dismiss
           </button>
@@ -295,9 +350,9 @@ export default function SalonUsersPage() {
                   required
                   className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
                 >
-                  {SALON_USER_ROLES.map((r) => (
-                    <option key={r} value={r}>
-                      {r.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                  {USER_ROLE_OPTIONS.map((role) => (
+                    <option key={role.value} value={role.value}>
+                      {role.label}
                     </option>
                   ))}
                 </select>
@@ -418,7 +473,7 @@ export default function SalonUsersPage() {
                     <td className="whitespace-nowrap px-4 py-3">
                       <button
                         type="button"
-                        onClick={() => setResetTarget(user)}
+                        onClick={() => openResetDialog(user)}
                         className="rounded border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
                       >
                         Reset Password
@@ -432,16 +487,111 @@ export default function SalonUsersPage() {
         )}
       </section>
 
-      <ConfirmDialog
-        open={!!resetTarget}
-        title="Reset password?"
-        description={`Generate a new temporary password for ${resetTarget?.name} (${resetTarget?.email})?`}
-        confirmLabel="Reset Password"
-        variant="default"
-        loading={resetting}
-        onConfirm={handleResetPassword}
-        onCancel={() => setResetTarget(null)}
-      />
+      {resetTarget ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div
+            className="absolute inset-0 bg-slate-900/50"
+            onClick={closeResetDialog}
+          />
+          <form
+            onSubmit={handleResetPassword}
+            className="relative mx-4 w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-xl"
+          >
+            <h3 className="text-base font-semibold text-slate-900">
+              Reset password
+            </h3>
+            <p className="mt-2 text-sm leading-relaxed text-slate-500">
+              Set a password manually or generate a temporary password for{" "}
+              {resetTarget.name} ({resetTarget.email}).
+            </p>
+
+            <div className="mt-5 space-y-4">
+              <div>
+                <label className="text-sm font-medium text-slate-700">
+                  New password
+                </label>
+                <input
+                  type="password"
+                  value={resetNewPassword}
+                  onChange={(e) => {
+                    setResetNewPassword(e.target.value);
+                    setResetError("");
+                  }}
+                  minLength={6}
+                  required
+                  autoFocus
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium text-slate-700">
+                  Confirm password
+                </label>
+                <input
+                  type="password"
+                  value={resetConfirmPassword}
+                  onChange={(e) => {
+                    setResetConfirmPassword(e.target.value);
+                    setResetError("");
+                  }}
+                  minLength={6}
+                  required
+                  className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
+                />
+              </div>
+            </div>
+
+            {resetError ? (
+              <div className="mt-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {resetError}
+              </div>
+            ) : null}
+
+            {resetGeneratedPassword ? (
+              <div className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-4 py-3">
+                <h4 className="text-sm font-semibold text-amber-800">
+                  New temporary password
+                </h4>
+                <p className="mt-1 text-xs text-amber-700">
+                  This password is shown only once. Copy it now.
+                </p>
+                <div className="mt-3 flex items-center gap-2">
+                  <code className="rounded bg-white px-3 py-1.5 font-mono text-sm text-slate-900">
+                    {resetGeneratedPassword}
+                  </code>
+                  <CopyButton text={resetGeneratedPassword} />
+                </div>
+              </div>
+            ) : null}
+
+            <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={handleGenerateResetPassword}
+                disabled={resetting}
+                className="rounded-lg border border-indigo-200 px-4 py-2 text-sm font-medium text-indigo-700 transition hover:bg-indigo-50 disabled:opacity-60"
+              >
+                {resetting ? "Processing..." : "Generate Temporary"}
+              </button>
+              <button
+                type="button"
+                onClick={closeResetDialog}
+                disabled={resetting}
+                className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={resetting}
+                className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700 disabled:opacity-60"
+              >
+                {resetting ? "Saving..." : "Set Password"}
+              </button>
+            </div>
+          </form>
+        </div>
+      ) : null}
     </div>
   );
 }

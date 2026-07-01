@@ -39,18 +39,19 @@ export type BusinessType = (typeof BUSINESS_TYPES)[number];
 
 export const SALON_USER_ROLES = [
   "salon_owner",
-  "salon_admin",
   "manager",
   "receptionist",
   "stylist",
-  "cashier",
-  "staff",
-  "beautician",
   "accountant",
-  "inventory_manager",
 ] as const;
 
 export type SalonUserRole = (typeof SALON_USER_ROLES)[number];
+
+export const END_USER_ROLE = "end_user" as const;
+
+export const APP_USER_ROLES = [...SALON_USER_ROLES, END_USER_ROLE] as const;
+
+export type AppUserRole = (typeof APP_USER_ROLES)[number];
 
 export const BILLING_CYCLES = ["monthly", "yearly", "trial"] as const;
 

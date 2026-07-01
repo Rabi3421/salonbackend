@@ -52,7 +52,7 @@ export async function GET(request: Request, context: RouteContext) {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const auth = await requireSalonUser(request, {
-      allowedRoles: ["owner", "manager"],
+      allowedRoles: ["owner"],
     });
     if (!auth.success) return errorResponse(auth.error, auth.status);
 

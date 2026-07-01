@@ -50,11 +50,6 @@ export default function ReportsMainPage() {
 
   return (
     <div className="space-y-6">
-      <section>
-        <p className="text-sm font-medium text-indigo-600">Reports</p>
-        <h1 className="mt-1 text-2xl font-semibold text-slate-900">Platform Reports</h1>
-      </section>
-
       <ReportRangeSelector range={range} dateFrom={dateFrom} dateTo={dateTo}
         onRangeChange={setRange} onDateFromChange={setDateFrom} onDateToChange={setDateTo} onApply={load} />
 

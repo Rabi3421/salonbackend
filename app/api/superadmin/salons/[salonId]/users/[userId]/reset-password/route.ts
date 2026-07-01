@@ -44,19 +44,26 @@ export async function POST(
       return errorResponse("User not found.", 404);
     }
 
-    let body: { newPassword?: string } = {};
+    let body: { newPassword?: unknown } = {};
 
     try {
-      body = (await request.json()) as { newPassword?: string };
+      body = (await request.json()) as { newPassword?: unknown };
     } catch {
-      // Body is optional for this endpoint
+      body = {};
     }
 
     let temporaryPassword: string | undefined;
     let passwordToHash: string;
 
-    if (body.newPassword && typeof body.newPassword === "string") {
-      passwordToHash = body.newPassword;
+    if (body.newPassword !== undefined) {
+      if (
+        typeof body.newPassword !== "string" ||
+        body.newPassword.trim().length < 6
+      ) {
+        return errorResponse("newPassword must be at least 6 characters.", 400);
+      }
+
+      passwordToHash = body.newPassword.trim();
     } else {
       temporaryPassword = crypto.randomBytes(12).toString("base64url");
       passwordToHash = temporaryPassword;

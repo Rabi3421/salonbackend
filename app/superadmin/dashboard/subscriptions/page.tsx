@@ -23,6 +23,11 @@ import {
   formatNullableDate,
   formatPlanCode,
 } from "@/src/lib/formatters";
+import {
+  readInitialSuperadminSearch,
+  SUPERADMIN_HEADER_SEARCH_EVENT,
+  type SuperadminHeaderSearchDetail,
+} from "@/src/lib/superadmin-header-search";
 import type { SubscriptionAccessStatus } from "@/src/types/superadmin-frontend";
 
 type FS = { data: SubscriptionListData | null; loading: boolean; error: string; key: number };
@@ -76,7 +81,7 @@ function AccessStatusBadge({ value }: { value?: string | null }) {
 
 export default function SubscriptionsListPage() {
   const [st, dp] = useReducer(fr, { data: null, loading: true, error: "", key: 0 });
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(readInitialSuperadminSearch);
   const [status, setStatus] = useState("");
   const [accessStatus, setAccessStatus] = useState("");
   const [cycle, setCycle] = useState("");
@@ -98,6 +103,18 @@ export default function SubscriptionsListPage() {
       .then((r) => dp({ type: "OK", data: r.data! }))
       .catch((e: Error) => dp({ type: "ERR", error: e.message }));
   }, [search, status, accessStatus, cycle, page, st.key]);
+
+  useEffect(() => {
+    function handleHeaderSearch(event: Event) {
+      const detail = (event as CustomEvent<SuperadminHeaderSearchDetail>).detail;
+      if (detail?.section !== "subscriptions") return;
+      setSearch(detail.search);
+      setPage(1);
+    }
+
+    window.addEventListener(SUPERADMIN_HEADER_SEARCH_EVENT, handleHeaderSearch);
+    return () => window.removeEventListener(SUPERADMIN_HEADER_SEARCH_EVENT, handleHeaderSearch);
+  }, []);
 
   async function handleCancel() {
     if (!cancelTarget) return;
@@ -134,11 +151,7 @@ export default function SubscriptionsListPage() {
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-indigo-600">Subscriptions</p>
-          <h1 className="mt-1 text-2xl font-semibold text-slate-900">Manage Subscriptions</h1>
-        </div>
+      <section className="flex justify-end">
         <div className="flex flex-wrap gap-2">
           <button type="button" onClick={handleCheckExpired} disabled={checking}
             className="shrink-0 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50 disabled:opacity-60">

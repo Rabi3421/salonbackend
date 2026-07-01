@@ -25,6 +25,7 @@ function buildNameFromEmail(email: string): string {
 function safeCustomerShape(customer: Record<string, unknown>) {
   return {
     id: String(customer._id ?? customer.id ?? ""),
+    role: "end_user",
     customerNo: String(customer.customerNo ?? ""),
     name: String(customer.name ?? ""),
     phone: String(customer.phone ?? ""),

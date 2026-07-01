@@ -16,6 +16,11 @@ import { StatusBadge } from "@/src/components/superadmin/StatusBadge";
 import { LoadingState } from "@/src/components/superadmin/LoadingState";
 import { ErrorState } from "@/src/components/superadmin/ErrorState";
 import { EmptyState } from "@/src/components/superadmin/EmptyState";
+import {
+  readInitialSuperadminSearch,
+  SUPERADMIN_HEADER_SEARCH_EVENT,
+  type SuperadminHeaderSearchDetail,
+} from "@/src/lib/superadmin-header-search";
 
 type FetchState = {
   data: SalonListData | null;
@@ -94,7 +99,7 @@ export default function SalonsListPage() {
     fetchKey: 0,
   });
 
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(readInitialSuperadminSearch);
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
   const limit = 20;
@@ -115,6 +120,18 @@ export default function SalonsListPage() {
       .then((res) => dispatch({ type: "FETCH_SUCCESS", data: res.data! }))
       .catch((err: Error) => dispatch({ type: "FETCH_ERROR", error: err.message }));
   }, [search, status, page, state.fetchKey]);
+
+  useEffect(() => {
+    function handleHeaderSearch(event: Event) {
+      const detail = (event as CustomEvent<SuperadminHeaderSearchDetail>).detail;
+      if (detail?.section !== "salons") return;
+      setSearch(detail.search);
+      setPage(1);
+    }
+
+    window.addEventListener(SUPERADMIN_HEADER_SEARCH_EVENT, handleHeaderSearch);
+    return () => window.removeEventListener(SUPERADMIN_HEADER_SEARCH_EVENT, handleHeaderSearch);
+  }, []);
 
   const { data, loading, error } = state;
 
@@ -161,11 +178,7 @@ export default function SalonsListPage() {
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-indigo-600">Salons</p>
-          <h1 className="mt-1 text-2xl font-semibold text-slate-900">Manage Salons</h1>
-        </div>
+      <section className="flex justify-end">
         <Link
           href="/superadmin/dashboard/salons/new"
           className="shrink-0 rounded-xl bg-indigo-600 px-4 py-2 text-center text-sm font-medium text-white transition hover:bg-indigo-700"
@@ -192,7 +205,7 @@ export default function SalonsListPage() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name, ID, email, phone, city..."
+              placeholder="Search by name, ID, email, phone..."
               className="flex-1 rounded-md border border-slate-300 px-3 py-2 text-sm outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20"
             />
             <select
@@ -244,7 +257,6 @@ export default function SalonsListPage() {
                     <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Salon Name</th>
                     <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Owner</th>
                     <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Phone</th>
-                    <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">City / State</th>
                     <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Account</th>
                     <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Website</th>
                     <th className="whitespace-nowrap px-4 py-3 font-medium text-slate-600">Created</th>
@@ -266,9 +278,6 @@ export default function SalonsListPage() {
                         <div className="text-xs text-slate-500">{salon.ownerEmail}</div>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-slate-600">{salon.ownerPhone}</td>
-                      <td className="whitespace-nowrap px-4 py-3 text-slate-600">
-                        {salon.city}{salon.state ? `, ${salon.state}` : ""}
-                      </td>
                       <td className="whitespace-nowrap px-4 py-3">
                         <StatusBadge value={salon.accountStatus} type="account" />
                       </td>

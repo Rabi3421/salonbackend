@@ -10,8 +10,8 @@ import {
   SALON_ACCESS_COOKIE_NAME,
   SALON_ACCESS_TOKEN_MAX_AGE,
 } from "@/src/lib/auth/salon-auth";
+import { normalizeBackendSalonRole } from "@/src/lib/auth/salon-permissions";
 import { SalonUser } from "@/src/models/SalonUser";
-import type { SalonUserRole } from "@/src/constants/salon";
 
 export async function POST(request: Request) {
   try {
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
     const accessToken = signSalonAccessToken({
       userId: payload.userId,
       salonId: headerSalonId,
-      role: userObj.role as string,
+      role: normalizeBackendSalonRole(String(userObj.role ?? "")),
     });
 
     const isProduction = process.env.NODE_ENV === "production";

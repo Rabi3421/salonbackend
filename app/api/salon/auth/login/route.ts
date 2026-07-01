@@ -12,6 +12,7 @@ import {
 } from "@/src/lib/auth/salon-auth";
 import {
   mapBackendSalonRoleToFrontend,
+  normalizeBackendSalonRole,
   sanitizeSalonUser,
 } from "@/src/lib/auth/salon-permissions";
 import {
@@ -20,7 +21,6 @@ import {
   buildSubscriptionPayload,
 } from "@/src/lib/subscription-access-service";
 import { SalonUser } from "@/src/models/SalonUser";
-import type { SalonUserRole } from "@/src/constants/salon";
 
 export async function POST(request: Request) {
   try {
@@ -67,7 +67,7 @@ export async function POST(request: Request) {
       return errorResponse("Invalid email or password.", 401);
     }
 
-    const backendRole = user.role as SalonUserRole;
+    const backendRole = normalizeBackendSalonRole(user.role as string);
     const frontendRole = mapBackendSalonRoleToFrontend(backendRole);
     const subscription = await getLatestSubscriptionForSalon(salonId);
     const subscriptionPayload = buildSubscriptionPayload(subscription as Record<string, unknown> | null);

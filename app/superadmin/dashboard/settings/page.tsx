@@ -113,11 +113,7 @@ export default function PlatformSettingsPage() {
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-indigo-600">Platform Settings</p>
-          <h1 className="mt-1 text-2xl font-semibold text-slate-900">Configuration</h1>
-        </div>
+      <section className="flex justify-end">
         <button type="button" onClick={handleReset}
           className="shrink-0 rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:bg-slate-50">
           Ensure Defaults

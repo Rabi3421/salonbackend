@@ -6,6 +6,7 @@ import type {
   SubscriptionBlockPayload,
   SubscriptionReactivatePayload,
   SimplePaymentRecord,
+  DashboardOverviewResponse,
 } from "@/src/types/superadmin-frontend";
 
 type ApiResponse<T = unknown> = {
@@ -42,28 +43,14 @@ async function request<T = unknown>(
 
 // ── Dashboard ──
 
-export type OverviewData = {
-  totalSalons: number;
-  activeSalons: number;
-  trialSalons: number;
-  expiredSalons: number;
-  suspendedSalons: number;
-  cancelledSalons: number;
-  monthlyRevenue: number;
-  totalRevenue: number;
-  pendingPayments: number;
-  pendingPaymentAmount: number;
-  failedPayments: number;
-  refundedPayments: number;
-  expiringTrials: number;
-  newEnquiries: number;
-  openEnquiries: number;
-  demoRequests: number;
-  supportRequests: number;
-};
+export type OverviewData = DashboardOverviewResponse;
 
 export function getDashboardOverview() {
   return request<OverviewData>("/api/superadmin/dashboard/overview");
+}
+
+export function fetchDashboardOverview() {
+  return getDashboardOverview();
 }
 
 // ── Salons ──

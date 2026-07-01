@@ -41,8 +41,6 @@ export const PLANS: Record<SimplePlanCode, PlanDefinition> = {
     allowedRoles: [
       "salon_owner",
       "manager",
-      "staff",
-      "beautician",
       "stylist",
     ],
     description:
@@ -55,15 +53,10 @@ export const PLANS: Record<SimplePlanCode, PlanDefinition> = {
     minimumPrice: 2000,
     allowedRoles: [
       "salon_owner",
-      "salon_admin",
       "manager",
       "receptionist",
-      "staff",
-      "beautician",
       "stylist",
-      "cashier",
       "accountant",
-      "inventory_manager",
     ],
     description: "All dashboards and full permissions",
   },

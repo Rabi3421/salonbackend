@@ -1,11 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import type { ReactNode } from "react";
+import type { FormEvent, ReactNode } from "react";
 
 import { LogoutButton } from "@/src/components/superadmin/LogoutButton";
+import {
+  getSuperadminSearchPath,
+  getSuperadminSearchSection,
+  SUPERADMIN_HEADER_SEARCH_EVENT,
+  type SuperadminHeaderSearchDetail,
+} from "@/src/lib/superadmin-header-search";
 
 const navigationItems = [
   { label: "Dashboard", href: "/superadmin/dashboard", icon: "grid" },
@@ -18,6 +24,64 @@ const navigationItems = [
   { label: "Audit Logs", href: "/superadmin/dashboard/audit-logs", icon: "shield" },
   { label: "Settings", href: "/superadmin/dashboard/settings", icon: "settings" },
 ];
+
+function getPageTitle(pathname: string) {
+  const parts = pathname.split("/").filter(Boolean);
+  const section = parts[2];
+  const child = parts[3];
+  const action = parts[4];
+
+  if (!section) return "Dashboard";
+
+  if (section === "salons") {
+    if (child === "new") return "Create Salon";
+    if (action === "edit") return "Edit Salon";
+    if (action === "users") return "Salon Users";
+    if (action === "status") return "Manage Status";
+    if (action === "website-content") return "Website Content";
+    return child ? "Salon Detail" : "Manage Salons";
+  }
+
+  if (section === "plans") {
+    if (child === "new") return "Create Plan";
+    if (action === "edit") return "Edit Plan";
+    return child ? "Plan Detail" : "Subscription Plans";
+  }
+
+  if (section === "subscriptions") {
+    if (child === "new") return "Assign Subscription";
+    if (action === "renew") return "Renew Subscription";
+    if (action === "change-plan") return "Change Plan";
+    return child ? "Subscription Detail" : "Manage Subscriptions";
+  }
+
+  if (section === "payments") {
+    if (child === "new") return "Add Payment";
+    if (action === "edit") return "Edit Payment";
+    return child ? "Payment Detail" : "Platform Payments";
+  }
+
+  if (section === "enquiries") {
+    if (child === "new") return "Add Enquiry";
+    if (action === "edit") return "Edit Enquiry";
+    return child ? "Enquiry Detail" : "Manage Enquiries";
+  }
+
+  if (section === "reports") {
+    if (child === "revenue") return "Revenue Report";
+    if (child === "salons") return "Salon Report";
+    if (child === "subscriptions") return "Subscription Report";
+    if (child === "payments") return "Payment Report";
+    if (child === "enquiries") return "Enquiry Report";
+    if (child === "plans") return "Plan Usage Report";
+    return "Platform Reports";
+  }
+
+  if (section === "audit-logs") return child ? "Audit Log Detail" : "Activity Log";
+  if (section === "settings") return "Configuration";
+
+  return "Superadmin";
+}
 
 const ICONS: Record<string, ReactNode> = {
   grid: <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>,
@@ -37,9 +101,11 @@ export default function SuperadminDashboardLayout({
   children: ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [superadminEmail, setSuperadminEmail] = useState("");
+  const pageTitle = getPageTitle(pathname);
 
   useEffect(() => {
     let mounted = true;
@@ -70,6 +136,25 @@ export default function SuperadminDashboardLayout({
   function isActive(href: string) {
     if (href === "/superadmin/dashboard") return pathname === href;
     return pathname.startsWith(href);
+  }
+
+  function handleHeaderSearch(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const search = String(formData.get("search") ?? "").trim();
+    const section = getSuperadminSearchSection(pathname);
+    const targetPath = getSuperadminSearchPath(section);
+    const params = new URLSearchParams();
+
+    if (search) params.set("search", search);
+
+    router.push(params.size > 0 ? `${targetPath}?${params.toString()}` : targetPath);
+
+    window.dispatchEvent(
+      new CustomEvent<SuperadminHeaderSearchDetail>(SUPERADMIN_HEADER_SEARCH_EVENT, {
+        detail: { section, search },
+      }),
+    );
   }
 
   return (
@@ -162,20 +247,27 @@ export default function SuperadminDashboardLayout({
                 </div>
               </div>
 
-              <div className="hidden flex-1 lg:block">
-                <div className="relative max-w-md">
+              <div className="hidden min-w-0 flex-1 items-center gap-8 lg:flex">
+                <h1 className="min-w-[180px] shrink-0 text-xl font-bold text-slate-900">
+                  {pageTitle}
+                </h1>
+                <form key={pathname} onSubmit={handleHeaderSearch} className="relative w-full max-w-md">
                   <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                     <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
                   </svg>
                   <input
                     type="text"
-                    placeholder="Search..."
+                    name="search"
+                    placeholder={`Search ${pageTitle}...`}
                     className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-10 pr-4 text-sm text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-500/10"
                   />
-                </div>
+                </form>
               </div>
 
               <div className="relative flex items-center gap-3">
+                <h1 className="max-w-[42vw] truncate text-base font-bold text-slate-900 lg:hidden">
+                  {pageTitle}
+                </h1>
                 <button
                   type="button"
                   onClick={() => setProfileOpen((value) => !value)}

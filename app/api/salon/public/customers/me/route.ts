@@ -1,0 +1,24 @@
+import { NextResponse } from "next/server";
+
+import { errorResponse, successResponse } from "@/src/lib/api-response";
+import { requireCustomer } from "@/src/lib/auth/require-customer";
+import { serializeCustomerAccount } from "@/src/lib/serializers/customer-account";
+
+export async function GET(request: Request) {
+  try {
+    const auth = await requireCustomer(request);
+    if (!auth.success) {
+      return errorResponse(auth.error, auth.status);
+    }
+
+    return successResponse({
+      customer: serializeCustomerAccount(auth.customer),
+    });
+  } catch {
+    return errorResponse("Unauthorized.", 401);
+  }
+}
+
+export function OPTIONS() {
+  return new NextResponse(null, { status: 204 });
+}

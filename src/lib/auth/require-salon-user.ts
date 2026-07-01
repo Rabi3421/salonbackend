@@ -6,6 +6,7 @@ import {
 } from "@/src/lib/auth/salon-auth";
 import {
   mapBackendSalonRoleToFrontend,
+  normalizeBackendSalonRole,
   sanitizeSalonUser,
   hasSalonRole,
   type FrontendSalonRole,
@@ -124,7 +125,7 @@ export async function requireSalonUser(
   }
 
   // 6. Map role
-  const backendRole = userObj.role as SalonUserRole;
+  const backendRole = normalizeBackendSalonRole(String(userObj.role ?? ""));
   const frontendRole = mapBackendSalonRoleToFrontend(backendRole);
 
   const subscription = await getLatestSubscriptionForSalon(headerSalonId);

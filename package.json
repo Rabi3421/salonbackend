@@ -11,7 +11,8 @@
     "seed:salon-plans": "tsx -r dotenv/config src/scripts/seed-salon-subscription-plans.ts",
     "backfill:salon-subscriptions": "tsx -r dotenv/config src/scripts/backfill-salon-subscriptions.ts",
     "seed:simple-plans": "tsx -r dotenv/config src/scripts/seed-simple-plans.ts",
-    "migrate:simple-statuses": "tsx -r dotenv/config src/scripts/migrate-to-simple-statuses.ts"
+    "migrate:simple-statuses": "tsx -r dotenv/config src/scripts/migrate-to-simple-statuses.ts",
+    "migrate:salon-user-roles": "tsx -r dotenv/config src/scripts/normalize-salon-user-roles.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
@@ -21,7 +22,8 @@
     "mongoose": "^9.7.2",
     "next": "16.2.9",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "recharts": "^3.9.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

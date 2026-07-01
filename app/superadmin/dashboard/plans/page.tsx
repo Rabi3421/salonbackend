@@ -13,6 +13,11 @@ import { StatusBadge } from "@/src/components/superadmin/StatusBadge";
 import { LoadingState } from "@/src/components/superadmin/LoadingState";
 import { ErrorState } from "@/src/components/superadmin/ErrorState";
 import { EmptyState } from "@/src/components/superadmin/EmptyState";
+import {
+  readInitialSuperadminSearch,
+  SUPERADMIN_HEADER_SEARCH_EVENT,
+  type SuperadminHeaderSearchDetail,
+} from "@/src/lib/superadmin-header-search";
 
 type FetchState = {
   data: PlanListData | null;
@@ -64,7 +69,7 @@ export default function PlansListPage() {
     fetchKey: 0,
   });
 
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(readInitialSuperadminSearch);
   const [status, setStatus] = useState("");
   const [page, setPage] = useState(1);
 
@@ -80,6 +85,18 @@ export default function PlansListPage() {
       .then((res) => dispatch({ type: "FETCH_SUCCESS", data: res.data! }))
       .catch((err: Error) => dispatch({ type: "FETCH_ERROR", error: err.message }));
   }, [search, status, page, state.fetchKey]);
+
+  useEffect(() => {
+    function handleHeaderSearch(event: Event) {
+      const detail = (event as CustomEvent<SuperadminHeaderSearchDetail>).detail;
+      if (detail?.section !== "plans") return;
+      setSearch(detail.search);
+      setPage(1);
+    }
+
+    window.addEventListener(SUPERADMIN_HEADER_SEARCH_EVENT, handleHeaderSearch);
+    return () => window.removeEventListener(SUPERADMIN_HEADER_SEARCH_EVENT, handleHeaderSearch);
+  }, []);
 
   async function handleSeed() {
     setSeeding(true);
@@ -104,13 +121,9 @@ export default function PlansListPage() {
 
   return (
     <div className="space-y-6">
-      <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-indigo-600">Plans</p>
-          <h1 className="mt-1 text-2xl font-semibold text-slate-900">
-            Subscription Plans
-          </h1>
-          <p className="mt-2 max-w-2xl text-sm text-slate-500">
+          <p className="max-w-2xl text-sm text-slate-500">
             Basic and Premium are fixed platform plans. Use salon subscription policy to negotiate prices per salon.
           </p>
         </div>
@@ -123,12 +136,14 @@ export default function PlansListPage() {
           >
             {seeding ? "Seeding..." : "Seed Default Plans"}
           </button>
+          <Link
+            href="/superadmin/dashboard/plans/new"
+            className="shrink-0 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition hover:bg-indigo-700"
+          >
+            Create Plan
+          </Link>
         </div>
       </section>
-
-      <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-        Plan creation is intentionally disabled because subscription access, role permissions, pricing floors, due dates, and grace-period rules are tied to the fixed Basic/Premium policy.
-      </div>
 
       {seedMsg ? (
         <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-700">
@@ -259,16 +274,21 @@ export default function PlansListPage() {
                         />
                       </td>
                       <td className="whitespace-nowrap px-4 py-3">
-                        <div className="flex gap-1">
+                        <div className="flex items-center gap-0.5">
                           <Link
                             href={`/superadmin/dashboard/plans/${plan.planCode}`}
-                            className="rounded border border-slate-200 px-2 py-1 text-xs font-medium text-slate-600 transition hover:bg-slate-50"
+                            title="View"
+                            className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                           >
-                            View
+                            <svg className="size-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                           </Link>
-                          <span className="rounded border border-slate-200 px-2 py-1 text-xs font-medium text-slate-400">
-                            Fixed
-                          </span>
+                          <Link
+                            href={`/superadmin/dashboard/plans/${plan.planCode}/edit`}
+                            title="Edit"
+                            className="rounded-md p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                          >
+                            <svg className="size-4" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" /></svg>
+                          </Link>
                         </div>
                       </td>
                     </tr>

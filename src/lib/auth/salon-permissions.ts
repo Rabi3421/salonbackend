@@ -12,21 +12,31 @@ export type FrontendSalonRole = (typeof FRONTEND_SALON_ROLES)[number];
 
 const BACKEND_TO_FRONTEND_ROLE: Record<SalonUserRole, FrontendSalonRole> = {
   salon_owner: "owner",
-  salon_admin: "manager",
   manager: "manager",
   receptionist: "receptionist",
   stylist: "stylist",
+  accountant: "accountant",
+};
+
+const LEGACY_BACKEND_ROLE_ALIASES: Record<string, SalonUserRole> = {
+  salon_admin: "manager",
   cashier: "accountant",
   staff: "stylist",
   beautician: "stylist",
-  accountant: "accountant",
   inventory_manager: "manager",
 };
 
+export function normalizeBackendSalonRole(role: string): SalonUserRole {
+  if ((Object.keys(BACKEND_TO_FRONTEND_ROLE) as string[]).includes(role)) {
+    return role as SalonUserRole;
+  }
+  return LEGACY_BACKEND_ROLE_ALIASES[role] ?? "stylist";
+}
+
 export function mapBackendSalonRoleToFrontend(
-  role: SalonUserRole,
+  role: SalonUserRole | string,
 ): FrontendSalonRole {
-  return BACKEND_TO_FRONTEND_ROLE[role] ?? "stylist";
+  return BACKEND_TO_FRONTEND_ROLE[normalizeBackendSalonRole(role)] ?? "stylist";
 }
 
 const FRONTEND_TO_BACKEND_ROLE: Record<FrontendSalonRole, SalonUserRole> = {
@@ -34,7 +44,7 @@ const FRONTEND_TO_BACKEND_ROLE: Record<FrontendSalonRole, SalonUserRole> = {
   manager: "manager",
   receptionist: "receptionist",
   stylist: "stylist",
-  accountant: "cashier",
+  accountant: "accountant",
 };
 
 export function mapFrontendSalonRoleToBackend(

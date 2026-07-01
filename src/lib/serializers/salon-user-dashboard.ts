@@ -1,8 +1,8 @@
 import {
   mapBackendSalonRoleToFrontend,
+  normalizeBackendSalonRole,
   type FrontendSalonRole,
 } from "@/src/lib/auth/salon-permissions";
-import type { SalonUserRole } from "@/src/constants/salon";
 
 function baseShape(doc: Record<string, unknown>): Record<string, unknown> {
   const { _id, __v, passwordHash: _ph, ...rest } = doc;
@@ -13,7 +13,7 @@ export function serializeSalonDashboardUser(
   doc: Record<string, unknown>,
 ): Record<string, unknown> {
   const shaped = baseShape(doc);
-  const backendRole = shaped.role as SalonUserRole;
+  const backendRole = normalizeBackendSalonRole(String(shaped.role ?? ""));
   const frontendRole: FrontendSalonRole =
     mapBackendSalonRoleToFrontend(backendRole);
   shaped.backendRole = backendRole;
